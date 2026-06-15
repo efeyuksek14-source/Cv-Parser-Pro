@@ -3,11 +3,30 @@ import json
 from PyPDF2 import PdfReader
 import docx
 from google import genai
+from pymongo import MongoClient
+import datetime
 
 # ----------------------------------------
-# 🔑 APİ AYARI (Streamlit Kasasından Okuma)
+# 🔑 ŞİFRELER VE BAĞLANTILAR (Secrets)
 # ----------------------------------------
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+MONGO_URI = st.secrets.get("MONGO_URI", "")
+
+# MongoDB Bağlantısı
+@st.cache_resource
+def init_mongodb():
+    if MONGO_URI:
+        try:
+            client = MongoClient(MONGO_URI)
+            # cv_db adında bir veritabanı ve cv_collection adında bir tablo seçiyoruz
+            db = client["cv_db"]
+            return db["cv_collection"]
+        except Exception as e:
+            st.error(f"Veritabanı bağlantı hatası: {str(e)}")
+            return None
+    return None
+
+db_collection = init_mongodb()
 
 # 1. Dosyalardan Metin Okuma Fonksiyonları
 def read_pdf(file):
@@ -45,22 +64,17 @@ def analyze_cv_with_ai(cv_text):
         Aşağıdaki CV metnini analiz et ve bilgileri tam olarak şu JSON formatında ayıkla.
         Hiçbir yorum yapma, sadece saf JSON döndür.
         
-        CRITICAL INSTRUCTION FOR LISTS: 
-        "Egitim" ve "Deneyim" alanlarını asla tek bir paragraf veya düz metin olarak yazma. 
-        Her bir okulu ve her bir iş deneyimini bir liste (array) elemanı olarak ayır. 
-        Her iş deneyimi maddesi şu düzende olsun: "Şirket Adı - Pozisyon (Başlangıç - Bitiş Tarihi) / Varsa yapılan işlerin kısa özeti"
-        
         Format:
         {{
             "Ad Soyad": "",
             "Telefon": "",
             "E-posta": "",
             "Adres": "Adayın açık adresi, şehir veya ikametgah bilgisi",
-            "Egitim": ["Okul 1 - Bölüm (Mezuniyet Yılı)", "Okul 2 - Bölüm (Yıl)"],
-            "Deneyim": ["Şirket 1 - Pozisyon (Yıl-Yıl) - Görev özeti", "Şirket 2 - Pozisyon (Yıl-Yıl)"],
-            "Yetenekler": "Adayın bildiği diller, programlar ve yetenekler (Virgülle ayrılmış şık bir metin)",
-            "Vize Pasaport": "Eğer varsa vize ve pasaport durumları, yoksa Belirtilmemiş yaz",
-            "Referanslar": "Eğer varsa referans kişileri ve bilgileri"
+            "Egitim": ["Okul 1 - Bölüm (Mezuniyet Yılı)"],
+            "Deneyim": ["Şirket 1 - Pozisyon (Yıl-Yıl) - Görev özeti"],
+            "Yetenekler": "Adayın bildiği diller, programlar (Virgülle ayrılmış metin)",
+            "Vize Pasaport": "Vize ve pasaport durumları, yoksa Belirtilmemiş yaz",
+            "Referanslar": "Referans kişileri ve bilgileri"
         }}
         
         CV Metni:
@@ -95,7 +109,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🤖 Yapay Zeka Destekli CV Analiz Merkezi")
-st.write("Yüklediğiniz özgeçmişleri saniyeler içinde analiz eder, kritik bilgileri yapılandırılmış olarak sunar.")
+st.write("Yüklediğiniz özgeçmişleri analiz eder, sonuçları veritabanında saklar.")
 st.write("---")
 
 col_left, col_right = st.columns([1, 1.5])
@@ -114,61 +128,58 @@ with col_left:
         
         st.write("---")
         if st.button("🚀 Yapay Zeka İle Analiz Et", type="primary"):
-            with st.spinner("Yapay zeka CV'yi satır satır inceliyor..."):
-                st.session_state.ai_results = analyze_cv_with_ai(raw_text)
+            with st.spinner("Yapay zeka CV'yi inceliyor..."):
+                ai_result = analyze_cv_with_ai(raw_text)
+                st.session_state.ai_results = ai_result
+                
+                # VERİTABANINA KAYDETME İŞLEMİ (Eğer bağlantı varsa ve hata yoksa)
+                if db_collection is not None and "Hata" not in ai_result:
+                    # Verinin içine analiz tarihini de ekliyoruz
+                    ai_result["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    db_collection.insert_one(ai_result)
+                    st.success("💾 Analiz sonucu başarıyla MongoDB veritabanına kaydedildi!")
 
 with col_right:
-    st.subheader("📊 Yapılandırılmış Sonuçlar")
-    
+    st.subheader("📊 Anlık Sonuç")
     if 'ai_results' in st.session_state:
         res = st.session_state.ai_results
-        
         if "Hata" in res:
             st.error(res["Hata"])
         else:
             st.balloons()
-            
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
-            st.markdown(f"### 👤 Kişisel & İletişim Bilgileri")
-            st.markdown(f"**Adı Soyadı:** {res.get('Ad Soyad', 'Belirtilmemiş')}")
-            st.markdown(f"**📞 Telefon:** {res.get('Telefon', 'Belirtilmemiş')}")
-            st.markdown(f"**📧 E-posta:** {res.get('E-posta', 'Belirtilmemiş')}")
-            st.markdown(f"**🏠 Adres:** {res.get('Adres', 'Belirtilmemiş')}")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="result-card">', unsafe_allow_html=True)
-            st.markdown(f"### 🛂 Vize & Pasaport Durumu")
-            st.write(res.get('Vize Pasaport', 'Belirtilmemiş'))
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="result-card">', unsafe_allow_html=True)
-            st.markdown(f"### 🎓 Eğitim Geçmişi")
-            egitim_listesi = res.get('Egitim', [])
-            if isinstance(egitim_listesi, list) and len(egitim_listesi) > 0:
-                for okul in egitim_listesi:
-                    st.markdown(f'<div class="bullet-item">🔹 {okul}</div>', unsafe_allow_html=True)
-            else:
-                st.write(str(egitim_listesi) if egitim_listesi else "Belirtilmemiş")
+            st.markdown(f"### 👤 Kişisel Bilgiler")
+            st.write(f"**Adı Soyadı:** {res.get('Ad Soyad', 'Belirtilmemiş')}")
+            st.write(f"**📞 Telefon:** {res.get('Telefon', 'Belirtilmemiş')}")
+            st.write(f"**📧 E-posta:** {res.get('E-posta', 'Belirtilmemiş')}")
             st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.markdown(f"### 💼 İş Tecrübeleri")
-            deneyim_listesi = res.get('Deneyim', [])
-            if isinstance(deneyim_listesi, list) and len(deneyim_listesi) > 0:
-                for iş in deneyim_listesi:
-                    st.markdown(f'<div class="bullet-item">💼 {iş}</div>', unsafe_allow_html=True)
-            else:
-                st.write(str(deneyim_listesi) if deneyim_listesi else "Belirtilmemiş")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="result-card">', unsafe_allow_html=True)
-            st.markdown(f"### 💡 Yetenekler & Beceriler")
-            st.write(res.get('Yetenekler', 'Belirtilmemiş'))
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="result-card">', unsafe_allow_html=True)
-            st.markdown(f"### 🤝 Referanslar")
-            st.write(res.get('Referanslar', 'Belirtilmemiş'))
+            for is_madde in res.get('Deneyim', []):
+                st.markdown(f'<div class="bullet-item">💼 {is_madde}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Sol taraftan bir CV yükleyip analiz butonuna bastığınızda, yapay zekanın ayıkladığı temiz veriler burada listelenecektir.")
+        st.info("Yüklediğiniz CV'nin anlık sonucu burada görünecektir.")
+
+# --- YENİ BÖLÜM: VERİTABANI GEÇMİŞİ ---
+st.write("---")
+st.subheader("🗄️ Geçmiş CV Analizleri (MongoDB Veritabanı)")
+
+if db_collection is not None:
+    # Veritabanındaki tüm kayıtları çekip listeliyoruz (en yeni yüklenen en üstte)
+    kayitlar = list(db_collection.find().sort("_id", -1))
+    
+    if len(kayitlar) > 0:
+        for kayit in kayitlar:
+            with st.expander(f"📄 {kayit.get('Ad Soyad', 'İsimsiz Aday')} - {kayit.get('kayit_tarihi', '')}"):
+                st.write(f"**📞 Telefon:** {kayit.get('Telefon', '-')}")
+                st.write(f"**📧 E-posta:** {kayit.get('E-posta', '-')}")
+                st.write(f"**💡 Yetenekler:** {kayit.get('Yetenekler', '-')}")
+                st.write("**💼 Deneyimler:**")
+                for d in kayit.get('Deneyim', []):
+                    st.write(f"- {d}")
+    else:
+        st.info("Henüz veritabanında kayıtlı CV bulunmuyor. İlk analizi yaptığınızda burada listelenecektir.")
+else:
+    st.warning("Veritabanı bağlantısı kurulamadı. Lütfen Secrets ayarlarını kontrol edin.")
