@@ -19,14 +19,34 @@ def read_pdf(file):
         text += page.extract_text() or ""
     return text
 
+# Güçlendirilmiş Word Okuma Fonksiyonu (Hataları önlemek için)
 def read_docx(file):
-    doc = docx.Document(file)
-    text = ""
-    for para in doc.paragraphs:
-        text += para.text + "\n"
-    return text
+    try:
+        doc = docx.Document(file)
+        text_parts = []
+        
+        # Tüm paragrafları oku
+        for para in doc.paragraphs:
+            if para.text.strip():
+                text_parts.append(para.text)
+                
+        # Eğer CV'de tablolar varsa, tabloların içindeki metinleri de oku
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in cell.paragraphs if hasattr(cell, 'paragraphs') else row.cells:
+                    # Alternatif güvenli hücre okuma
+                    pass
+            # Daha basit ve hatasız hücre tarama:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text.strip():
+                        text_parts.append(cell.text)
+                        
+        return "\n".join(text_parts)
+    except Exception as e:
+        return f"Word dosyası okunurken hata oluştu: {str(e)}"
 
-# 2. Yapay Zeka ile Bilgi Ayıklama Fonksiyonu (Maddeleme Zorunlu Kılınmış Sürüm)
+# 2. Yapay Zeka ile Bilgi Ayıklama Fonksiyonu
 def analyze_cv_with_ai(cv_text):
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
@@ -75,7 +95,6 @@ def analyze_cv_with_ai(cv_text):
 # 3. Streamlit Arayüz Tasarımı
 st.set_page_config(page_title="AI CV Parser Pro", page_icon="🤖", layout="wide")
 
-# Kurumsal Şık Stil Ayarları
 st.markdown("""
     <style>
     .main { background-color: #f4f6f9; }
@@ -89,7 +108,6 @@ st.title("🤖 Yapay Zeka Destekli CV Analiz Merkezi")
 st.write("Yüklediğiniz özgeçmişleri saniyeler içinde analiz eder, kritik bilgileri yapılandırılmış olarak sunar.")
 st.write("---")
 
-# Sayfa Düzeni
 col_left, col_right = st.columns([1, 1.5])
 
 with col_left:
@@ -120,7 +138,6 @@ with col_right:
         else:
             st.balloons()
             
-            # 1. Kişisel Bilgiler
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.markdown(f"### 👤 Kişisel & İletişim Bilgileri")
             st.markdown(f"**Adı Soyadı:** {res.get('Ad Soyad', 'Belirtilmemiş')}")
@@ -129,13 +146,11 @@ with col_right:
             st.markdown(f"**🏠 Adres:** {res.get('Adres', 'Belirtilmemiş')}")
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # 2. Vize Durumu
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.markdown(f"### 🛂 Vize & Pasaport Durumu")
             st.write(res.get('Vize Pasaport', 'Belirtilmemiş'))
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # 3. Eğitim Geçmişi (Madde Madde)
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.markdown(f"### 🎓 Eğitim Geçmişi")
             egitim_listesi = res.get('Egitim', [])
@@ -146,7 +161,6 @@ with col_right:
                 st.write(str(egitim_listesi) if egitim_listesi else "Belirtilmemiş")
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # 4. İş Tecrübeleri (İSTEDİĞİN MADDE MADDE TASARIM)
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.markdown(f"### 💼 İş Tecrübeleri")
             deneyim_listesi = res.get('Deneyim', [])
@@ -157,13 +171,11 @@ with col_right:
                 st.write(str(deneyim_listesi) if deneyim_listesi else "Belirtilmemiş")
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # 5. Yetenekler
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.markdown(f"### 💡 Yetenekler & Beceriler")
             st.write(res.get('Yetenekler', 'Belirtilmemiş'))
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # 6. Referanslar
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.markdown(f"### 🤝 Referanslar")
             st.write(res.get('Referanslar', 'Belirtilmemiş'))
