@@ -18,7 +18,6 @@ def init_mongodb():
     if MONGO_URI:
         try:
             client = MongoClient(MONGO_URI)
-            # cv_db adında bir veritabanı ve cv_collection adında bir tablo seçiyoruz
             db = client["cv_db"]
             return db["cv_collection"]
         except Exception as e:
@@ -132,12 +131,11 @@ with col_left:
                 ai_result = analyze_cv_with_ai(raw_text)
                 st.session_state.ai_results = ai_result
                 
-                # VERİTABANINA KAYDETME İŞLEMİ (Eğer bağlantı varsa ve hata yoksa)
+                # VERİTABANINA KAYDETME İŞLEMİ
                 if db_collection is not None and "Hata" not in ai_result:
-                    # Verinin içine analiz tarihini de ekliyoruz
                     ai_result["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     db_collection.insert_one(ai_result)
-                    st.success("💾 Analiz sonucu başarıyla MongoDB veritabanına kaydedildi!")
+                    st.success("💾 Analiz sonucu başarıyla kaydedildi!")
 
 with col_right:
     st.subheader("📊 Anlık Sonuç")
@@ -162,24 +160,26 @@ with col_right:
     else:
         st.info("Yüklediğiniz CV'nin anlık sonucu burada görünecektir.")
 
-# --- YENİ BÖLÜM: VERİTABANI GEÇMİŞİ ---
+# --- TEMİZLENMİŞ VERİTABANI GEÇMİŞİ BÖLÜMÜ ---
 st.write("---")
-st.subheader("🗄️ Geçmiş CV Analizleri (MongoDB Veritabanı)")
+st.subheader("🗄️ Geçmiş CV Analizleri")
 
 if db_collection is not None:
-    # Veritabanındaki tüm kayıtları çekip listeliyoruz (en yeni yüklenen en üstte)
-    kayitlar = list(db_collection.find().sort("_id", -1))
-    
-    if len(kayitlar) > 0:
-        for kayit in kayitlar:
-            with st.expander(f"📄 {kayit.get('Ad Soyad', 'İsimsiz Aday')} - {kayit.get('kayit_tarihi', '')}"):
-                st.write(f"**📞 Telefon:** {kayit.get('Telefon', '-')}")
-                st.write(f"**📧 E-posta:** {kayit.get('E-posta', '-')}")
-                st.write(f"**💡 Yetenekler:** {kayit.get('Yetenekler', '-')}")
-                st.write("**💼 Deneyimler:**")
-                for d in kayit.get('Deneyim', []):
-                    st.write(f"- {d}")
-    else:
-        st.info("Henüz veritabanında kayıtlı CV bulunmuyor. İlk analizi yaptığınızda burada listelenecektir.")
+    try:
+        kayitlar = list(db_collection.find().sort("_id", -1))
+        
+        if len(kayitlar) > 0:
+            for kayit in kayitlar:
+                with st.expander(f"📄 {kayit.get('Ad Soyad', 'İsimsiz Aday')} - {kayit.get('kayit_tarihi', '')}"):
+                    st.write(f"**📞 Telefon:** {kayit.get('Telefon', '-')}")
+                    st.write(f"**📧 E-posta:** {kayit.get('E-posta', '-')}")
+                    st.write(f"**💡 Yetenekler:** {kayit.get('Yetenekler', '-')}")
+                    st.write("**💼 Deneyimler:**")
+                    for d in kayit.get('Deneyim', []):
+                        st.write(f"- {d}")
+        else:
+            st.info("Henüz geçmiş bir analiz bulunmuyor. İlk analizi yaptığınızda burada listelenecektir.")
+    except Exception as e:
+        st.error(f"Veriler listelenirken hata oluştu: {str(e)}")
 else:
     st.warning("Veritabanı bağlantısı kurulamadı. Lütfen Secrets ayarlarını kontrol edin.")
