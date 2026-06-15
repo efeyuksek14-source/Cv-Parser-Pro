@@ -1,18 +1,13 @@
 import streamlit as st
-import re
 import json
 from PyPDF2 import PdfReader
 import docx
 from google import genai
-from google.genai import types
 
 # ----------------------------------------
-# 🔑 APİ AYARI (Artık şifre güvenli kasadan okunuyor!)
+# 🔑 APİ AYARI (Streamlit Kasasından Okuma)
 # ----------------------------------------
-try:
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-except Exception:
-    GEMINI_API_KEY = "Şifre Bulunamadı"
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 
 # 1. Dosyalardan Metin Okuma Fonksiyonları
 def read_pdf(file):
@@ -41,8 +36,8 @@ def read_docx(file):
 # 2. Yapay Zeka ile Bilgi Ayıklama Fonksiyonu
 def analyze_cv_with_ai(cv_text):
     try:
-        if GEMINI_API_KEY == "Şifre Bulunamadı":
-            return {"Hata": "Streamlit Settings -> Secrets kısmına GEMINI_API_KEY eklenmemiş!"}
+        if not GEMINI_API_KEY:
+            return {"Hata": "Streamlit Secrets alanına GEMINI_API_KEY eklenmemiş!"}
             
         client = genai.Client(api_key=GEMINI_API_KEY)
         
