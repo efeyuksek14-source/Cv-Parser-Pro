@@ -5,20 +5,12 @@ import time
 # 3. Arayüz Tasarımı
 st.set_page_config(page_title="AI CV Parser Pro", page_icon="🤖", layout="wide")
 
-# CSS stillerine renk durum kartlarını ekledik (Yeşil, Sarı, Kırmızı)
 st.markdown("""
     <style>
-    .main { background-color: #f4f6f9; }
+    .main { background-color: #ffffff; }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
-    .result-card { background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
-    .bullet-item { background-color: #f8fafc; padding: 10px 15px; border-left: 4px solid #3b82f6; border-radius: 4px; margin-bottom: 8px; font-size: 14px; }
+    .result-card { background-color: #ffffff; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
     .category-box { background-color: #e2e8f0; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; color: #475569; display: inline-block; margin-bottom: 10px; margin-right: 5px;}
-    
-    /* 🟢 Durum Renk Kartları (Yeşil, Sarı, Kırmızı, Mavi) */
-    .status-olumlu { border-left: 6px solid #16a34a !important; background-color: #f0fdf4 !important; }
-    .status-notr { border-left: 6px solid #eab308 !important; background-color: #fefce8 !important; }
-    .status-olumsuz { border-left: 6px solid #dc2626 !important; background-color: #fef2f2 !important; }
-    .status-yeni { border-left: 6px solid #2563eb !important; background-color: #eff6ff !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -51,7 +43,7 @@ if 'mock_cvs_db' not in st.session_state:
             "Yetenekler": "Python, Excel",
             "owner_email": "efe@ceyiznet.com",
             "kategori": "Stajyerler",
-            "durum": "Olumlu", # Durum eklendi
+            "durum": "Olumlu",
             "kayit_tarihi": "2026-06-16 10:00:00"
         },
         {
@@ -64,7 +56,7 @@ if 'mock_cvs_db' not in st.session_state:
             "Yetenekler": "Shopify, Trendyol Entegrasyon",
             "owner_email": "efe@ceyiznet.com",
             "kategori": "Genel",
-            "durum": "Nötr", # Durum eklendi
+            "durum": "Nötr",
             "kayit_tarihi": "2026-06-16 10:30:00"
         }
     ]
@@ -74,7 +66,6 @@ if 'logged_in' not in st.session_state:
 if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
-# Test Analiz Fonksiyonu
 def analyze_cv_mock(filename):
     time.sleep(0.4)
     return {
@@ -93,44 +84,25 @@ with st.sidebar:
     if not st.session_state.logged_in:
         st.subheader("🔐 Kullanıcı Paneli")
         auth_mode = st.radio("İşlem Seçin", ["Giriş Yap", "Kayıt Ol"])
-        
         email = st.text_input("E-posta Adresi").strip()
         password = st.text_input("Şifre", type="password")
         
         if auth_mode == "Kayıt Ol":
-            paket_secimi = st.selectbox("Satın Alınacak Paket", [
-                "Başlangıç Paketi (10$ - 100 CV)", 
-                "Profesyonel Paket (15$ - 500 CV)", 
-                "Kurumsal Paket (25$ - Sınırsız CV)"
-            ])
+            paket_secimi = st.selectbox("Satın Alınacak Paket", ["Başlangıç Paketi (10$)", "Profesyonel Paket (15$)", "Kurumsal Paket (25$)"])
             if st.button("Hesap Oluştur"):
                 if email and password:
                     if email in st.session_state.mock_users_db:
                         st.error("Bu e-posta adresi zaten kayıtlı!")
                     else:
-                        if "10$" in paket_secimi:
-                            hak = 100
-                            p_isim = "Başlangıç"
-                        elif "15$" in paket_secimi:
-                            hak = 500
-                            p_isim = "Profesyonel"
-                        else:
-                            hak = 9999
-                            p_isim = "Sınırsız (Kurumsal)"
-                            
+                        hak = 100 if "10$" in paket_secimi else (500 if "15$" in paket_secimi else 9999)
+                        p_isim = "Başlangıç" if "10$" in paket_secimi else ("Profesyonel" if "15$" in paket_secimi else "Sınırsız (Kurumsal)")
                         bitis_tarihi = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d")
                         st.session_state.mock_users_db[email] = {
-                            "password": password,
-                            "paket_turu": p_isim,
-                            "abonelik_durumu": "aktif",
-                            "abonelik_bitis": bitis_tarihi,
-                            "kalan_hak": hak,
-                            "kategoriler": ["Genel"]
+                            "password": password, "paket_turu": p_isim, "abonelik_durumu": "aktif", "abonelik_bitis": bitis_tarihi, "kalan_hak": hak, "kategoriler": ["Genel"]
                         }
-                        st.success("🎉 Hesabınız oluşturuldu! Giriş yapabilirsiniz.")
-                        
+                        st.success("🎉 Kayıt başarılı! Giriş yapabilirsiniz.")
         elif auth_mode == "Giriş Yap":
-            st.info("Hazır hesap:\n\nefe@ceyiznet.com / 123")
+            st.info("Hazır hesap: efe@ceyiznet.com / 123")
             if st.button("Giriş Yap"):
                 if email in st.session_state.mock_users_db and st.session_state.mock_users_db[email]["password"] == password:
                     st.session_state.logged_in = True
@@ -141,15 +113,9 @@ with st.sidebar:
     else:
         st.subheader("👤 Hesap Bilgileri")
         st.write(f"**Kullanıcı:** {st.session_state.user_email}")
-        
         u_info = st.session_state.mock_users_db[st.session_state.user_email]
         st.write(f"**Paket:** {u_info['paket_turu']}")
-        
-        if u_info['paket_turu'] == "Sınırsız (Kurumsal)":
-            st.write("**Kalan Hak:** Sınırsız ♾️")
-        else:
-            st.write(f"**Kalan Hak:** {u_info['kalan_hak']}")
-            
+        st.write(f"**Kalan Hak:** Sınırsız ♾️" if u_info['paket_turu'] == "Sınırsız (Kurumsal)" else f"**Kalan Hak:** {u_info['kalan_hak']}")
         st.write("---")
         st.subheader("🗺️ Menü")
         sayfa = st.radio("Gitmek İstediğiniz Sayfa:", ["🏠 Ana Sayfa (CV Analiz)", "📁 CVler (Yönetim & Kategori)"])
@@ -178,7 +144,6 @@ else:
             
             if uploaded_file is not None:
                 st.success(f"🔄 {uploaded_file.name} hazır.")
-                
                 if st.button("🚀 Analiz Et", type="primary"):
                     if u_info["kalan_hak"] > 0:
                         with st.spinner("Analiz ediliyor..."):
@@ -188,23 +153,23 @@ else:
                             ai_result["id"] = len(st.session_state.mock_cvs_db) + 1
                             ai_result["owner_email"] = st.session_state.user_email
                             ai_result["kategori"] = secilen_kat
-                            ai_result["durum"] = "Yeni" # İlk yüklemede durumu 'Yeni' (Mavi) yapıyoruz
+                            ai_result["durum"] = "Yeni"
                             ai_result["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             st.session_state.mock_cvs_db.append(ai_result)
                             
                             if u_info['paket_turu'] != "Sınırsız (Kurumsal)":
                                 st.session_state.mock_users_db[st.session_state.user_email]["kalan_hak"] -= 1
-                                
-                            st.success(f"💾 CV başarıyla '{secilen_kat}' kategorisine eklendi!")
                             st.rerun()
+                    else:
+                        st.error("❌ Limitiniz bitti!")
 
         with col_right:
             st.subheader("📊 Anlık Sonuç")
             if 'ai_results' in st.session_state:
                 res = st.session_state.ai_results
-                st.balloons()
-                st.markdown('<div class="result-card status-yeni">', unsafe_allow_html=True)
-                st.markdown(f"### 👤 Kişisel Bilgiler (Yeni Aday)")
+                # Balonlar tamamen silindi
+                st.markdown('<div class="result-card">', unsafe_allow_html=True)
+                st.markdown(f"### 👤 Kişisel Bilgiler")
                 st.write(f"**Adı Soyadı:** {res.get('Ad Soyad')}")
                 st.write(f"**📞 Telefon:** {res.get('Telefon')}")
                 st.write(f"**📧 E-posta:** {res.get('E-posta')}")
@@ -212,7 +177,7 @@ else:
             else:
                 st.info("Sonuçlar burada görünecek.")
 
-    # 📁 2. SAYFA: CV'LER (GEÇMİŞ, RENKLER VE DURUM YÖNETİMİ)
+    # 📁 2. SAYFA: CV'LER (SADE SATIR VE SONUNDA RENKLİ DAİRE)
     elif sayfa == "📁 CVler (Yönetim & Kategori)":
         st.subheader("📁 Özelleştirilmiş CV Deposu")
         
@@ -229,83 +194,67 @@ else:
                         
         st.write("---")
         
-        # 🔍 KATEGORİ VE DURUM FİLTRELERİ SIDE-BY-SIDE
         col_f1, col_f2 = st.columns(2)
         with col_f1:
             filtre_kategori = st.selectbox("📂 Kategori Filtresi:", ["Hepsi"] + u_info["kategoriler"])
         with col_f2:
-            filtre_durum = st.selectbox("🎨 Durum / Renk Filtresi:", ["Hepsi", "Yeni (Mavi)", "Olumlu (Yeşil)", "Nötr (Sarı)", "Olumsuz (Kırmızı)"])
+            filtre_durum = st.selectbox("🎨 Durum Filtresi:", ["Hepsi", "Yeni", "Olumlu", "Nötr", "Olumsuz"])
         
-        # Süzme İşlemleri
         kullanici_kayitlari = [c for c in st.session_state.mock_cvs_db if c["owner_email"] == st.session_state.user_email]
-        
         if filtre_kategori != "Hepsi":
             kullanici_kayitlari = [c for c in kullanici_kayitlari if c["kategori"] == filtre_kategori]
-            
         if filtre_durum != "Hepsi":
-            durum_esleme = {"Yeni (Mavi)": "Yeni", "Olumlu (Yeşil)": "Olumlu", "Nötr (Sarı)": "Nötr", "Olumsuz (Kırmızı)": "Olumsuz"}
-            kullanici_kayitlari = [c for c in kullanici_kayitlari if c["durum"] == durum_esleme[filtre_durum]]
+            kullanici_kayitlari = [c for c in kullanici_kayitlari if c["durum"] == filtre_durum]
             
-        st.write(f"### 📄 Aday Havuzu ({len(kullanici_kayitlari)} Aday Listeleniyor)")
+        st.write(f"### 📄 Aday Havuzu ({len(kullanici_kayitlari)} Aday)")
         
         if len(kullanici_kayitlari) > 0:
             for kayit in reversed(kullanici_kayitlari):
-                # Dinamik olarak CSS sınıfını belirliyoruz (Hangi renk şerit basılacak?)
-                class_map = {"Yeni": "status-yeni", "Olumlu": "status-olumlu", "Nötr": "status-notr", "Olumsuz": "status-olumsuz"}
-                current_css = class_map.get(kayit.get("durum", "Yeni"), "status-yeni")
+                # Duruma göre satırın sonuna eklenecek daire emojisini belirliyoruz
+                emoji_map = {"Yeni": "🔵", "Olumlu": "🟢", "Nötr": "🟡", "Olumsuz": "🔴"}
+                current_emoji = emoji_map.get(kayit.get("durum", "Yeni"), "🔵")
                 
-                # Başlığı ve expander'ı saracak küçük bir görsel kart simülasyonu
-                st.markdown(f'<div class="result-card {current_css}">', unsafe_allow_html=True)
+                # Ekran görüntüsü 2026-06-16 110126.png'deki gibi düz expander başlığı ve sonuna renkli daire
+                baslik = f"📄 {kayit.get('Ad Soyad')} | Durum: {kayit.get('durum')} | Tarih: {kayit.get('kayit_tarihi')} {current_emoji}"
                 
-                # Expander içeriği kartın içinde açılacak
-                with st.expander(f"📄 {kayit.get('Ad Soyad')} | Durum: {kayit.get('durum')} | Tarih: {kayit.get('kayit_tarihi')}"):
-                    # Rozetleri gösterelim
+                with st.expander(baslik):
                     st.markdown(f'<div class="category-box">📂 Kategori: {kayit.get("kategori")}</div>', unsafe_allow_html=True)
-                    
                     st.write(f"**📞 Telefon:** {kayit.get('Telefon')}")
                     st.write(f"**📧 E-posta:** {kayit.get('E-posta')}")
                     st.write(f"**📍 Adres:** {kayit.get('Adres')}")
                     st.write("---")
                     
-                    # 🚥 YENİ ÖZELLİK: RENK VE DURUM SEÇİMİ (BUTONLAR YAN YANA)
-                    st.write("**🚥 Aday Değerlendirme Durumunu Değiştir:**")
+                    # Buton alanları
+                    st.write("**🚥 Durumu Değiştir:**")
                     col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-                    
                     with col_b1:
-                        if st.button("🟢 Olumlu (Yeşil)", key=f"btn_ol__{kayit['id']}"):
+                        if st.button("🟢 Olumlu", key=f"btn_ol__{kayit['id']}"):
                             for idx, cv in enumerate(st.session_state.mock_cvs_db):
                                 if cv["id"] == kayit["id"]: st.session_state.mock_cvs_db[idx]["durum"] = "Olumlu"
                             st.rerun()
                     with col_b2:
-                        if st.button("🟡 Nötr (Sarı)", key=f"btn_no_{kayit['id']}"):
+                        if st.button("🟡 Nötr", key=f"btn_no_{kayit['id']}"):
                             for idx, cv in enumerate(st.session_state.mock_cvs_db):
                                 if cv["id"] == kayit["id"]: st.session_state.mock_cvs_db[idx]["durum"] = "Nötr"
                             st.rerun()
                     with col_b3:
-                        if st.button("🔴 Olumsuz (Kırmızı)", key=f"btn_sz_{kayit['id']}"):
+                        if st.button("🔴 Olumsuz", key=f"btn_sz_{kayit['id']}"):
                             for idx, cv in enumerate(st.session_state.mock_cvs_db):
                                 if cv["id"] == kayit["id"]: st.session_state.mock_cvs_db[idx]["durum"] = "Olumsuz"
                             st.rerun()
                     with col_b4:
-                        if st.button("🔵 Yeni (Mavi)", key=f"btn_yn_{kayit['id']}"):
+                        if st.button("🔵 Yeni", key=f"btn_yn_{kayit['id']}"):
                             for idx, cv in enumerate(st.session_state.mock_cvs_db):
                                 if cv["id"] == kayit["id"]: st.session_state.mock_cvs_db[idx]["durum"] = "Yeni"
                             st.rerun()
 
                     st.write("---")
-                    # 📁 KATEGORİ DEĞİŞTİRME SEÇENEĞİ
                     yeni_kat_atama = st.selectbox(
-                        "Adayı Başka Kategoriye Taşı:", 
-                        u_info["kategoriler"], 
-                        index=u_info["kategoriler"].index(kayit.get("kategori")),
-                        key=f"change_kat_{kayit['id']}"
+                        "Kategori Değiştir:", u_info["kategoriler"], index=u_info["kategoriler"].index(kayit.get("kategori")), key=f"change_kat_{kayit['id']}"
                     )
                     if yeni_kat_atama != kayit.get("kategori"):
                         for idx, cv_item in enumerate(st.session_state.mock_cvs_db):
                             if cv_item["id"] == kayit["id"]: st.session_state.mock_cvs_db[idx]["kategori"] = yeni_kat_atama
-                        st.success("Kategori güncellendi!")
                         st.rerun()
-                        
-                st.markdown('</div>', unsafe_allow_html=True) # Kart kapatma etiketi
         else:
-            st.info("Bu filtre kombinasyonunda henüz bir aday bulunmuyor.")
+            st.info("Aday bulunamadı.")
