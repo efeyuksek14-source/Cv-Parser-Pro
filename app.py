@@ -45,8 +45,20 @@ if 'mock_cvs_db' not in res_st.session_state:
             "owner_email": "efe@ceyiznet.com",
             "kategori": "Stajyerler",
             "durum": "Olumlu",
-            "sablon_eposta": "Sayın Ahmet Yılmaz,\n\nÖzgeçmişiniz incelenmiş ve olumlu bulunmuştur. Sizi mülakata davet etmek isteriz...",
             "kayit_tarihi": "2026-06-16 10:00:00"
+        },
+        {
+            "id": 2,
+            "Ad Soyad": "ELİF KAYA",
+            "Telefon": "+90 544 333 44 55",
+            "E-posta": "elif@example.com",
+            "Adres": "Beşiktaş, İstanbul",
+            "Deneyim": ["Ceyiznet - E-Ticaret Sorumlusu"],
+            "Yetenekler": "Shopify, Trendyol Entegrasyon",
+            "owner_email": "efe@ceyiznet.com",
+            "kategori": "Genel",
+            "durum": "Yeni",
+            "kayit_tarihi": "2026-06-16 10:30:00"
         }
     ]
 
@@ -68,16 +80,16 @@ def analyze_cv_mock(filename):
         "Yetenekler": "E-Ticaret, Python, Analiz"
     }
 
-# 📜 OTOMATİK E-POSTA ŞABLON MOTORU (Yapay zekanın üreteceği taslaklar)
+# 📜 İSTEK ÜZERİNE ÇALIŞACAK E-POSTA ŞABLON MOTORU
 def generate_email_template(aday_isim, durum):
     if durum == "Olumlu":
-        return f"Konu: İş Başvurusu Sonucu - Mülakat Daveti\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz özgeçmiş başvurusu ekiplerimiz tarafından detaylıca incelenmiş ve tecrübeleriniz pozisyonumuz için oldukça olumlu bulunmuştur.\n\nSizinle daha yakından tanışmak ve pozisyon detaylarını görüşmek üzere en kısa sürede bir online mülakat planlamak istiyoruz. Uygun olduğunuz gün ve saat aralıklarını bu e-postayı yanıtlayarak bizimle paylaşabilir misiniz?\n\nSürecimize gösterdiğiniz ilgi için teşekkür eder, iyi günler dileriz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+        return f"Konu: İş Başvurusu Sonucu - Mülakat Daveti\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz özgeçmiş başvurusu ekiplerimiz tarafından detaylıca incelenmiş ve tecrübeleriniz pozisyonumuz için oldukça olumlu bulunmuştur.\n\nSizinle daha yakından tanışmak ve pozisyon detaylarını görüşmek üzere en kısa sürede bir online mülakat planlamak istiyoruz. Uygun olduğunuz gün ve saat aralıklarını bu e-postayı yanıtlayarak bizimle paylaşebilir misiniz?\n\nSürecimize gösterdiğiniz ilgi için teşekkür eder, iyi günler dileriz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
     elif durum == "Olumsuz":
-        return f"Konu: İş Başvurusu Sonucu Bilgilendirmesi\n\nSayın {aday_isim},\n\nŞirketimize göstermiş olduğunuz ilgi ve yapmış olduğunuz iş başvurusu için çok teşekkür ederiz.\n\nNitelikli başvuruların yoğunluğu nedeniyle seçim yapmakta zorlandığımızı belirtmek isteriz. Özgeçmişiniz detaylıca incelenmiş ancak bu pozisyon için aranan spesifik kriterler doğrultusunda şu aşamada sürecimize farklı bir aday ile devam etme kararı alınmıştır.\n\nÖzgeçmişiniz, gelecekte açılabilecek diğer uygun pozisyonlar için veri tabanımızda saklanacaktır. Kariyer yolculuğunuzda başarılar dileriz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+        return f"Konu: İş Başvurusu Sonucu Bilgilendirmesi\n\nSayın {aday_isim},\n\nŞirketimize göstermiş olduğunuz ilgi ogunluğunuz ve yapmış olduğunuz iş başvurusu için çok teşekkür ederiz.\n\nÖzgeçmişiniz detaylıca incelenmiş ancak bu pozisyon için aranan spesifik kriterler doğrultusunda şu aşamada sürecimize farklı bir aday ile devam etme kararı alınmıştır. Kariyer yolculuğunuzda başarılar dileriz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
     elif durum == "Nötr":
-        return f"Konu: İş Başvurusu Durumu - Değerlendirme Süreci\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz iş başvurusu İnsan Kaynakları havuzumuza başarıyla kaydedilmiştir.\n\nŞu an için ilgili pozisyona ait değerlendirmelerimiz devam etmekte olup, sürecin tamamlanmasının ardından tarafınıza tekrar geri dönüş sağlanacaktır. Bu süreçte göstermiş olduğunuz sabır ve ilgi için teşekkür ederiz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+        return f"Konu: İş Başvurusu Durumu - Değerlendirme Süreci\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz iş başvurusu İnsan Kaynakları havuzumuza başarıyla kaydedilmiştir. İlgili pozisyona ait değerlendirmelerimiz devam etmekte olup, sürecin tamamlanmasının ardından tarafınıza geri dönüş sağlanacaktır.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
     else:
-        return "Lütfen aday durumunu seçerek otomatik e-posta taslağını oluşturun."
+        return f"Konu: Başvurunuz Hakkında\n\nSayın {aday_isim},\n\nİş başvurunuz sistemimize ulaştı. Güncel durumunuz 'Yeni' olarak işaretlenmiştir, değerlendirme süreci başlayacaktır.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
 
 # ----------------------------------------
 # 🚪 YAN PANEL SİSTEMİ
@@ -138,7 +150,7 @@ if not res_st.session_state.logged_in:
 else:
     u_info = res_st.session_state.mock_users_db[res_st.session_state.user_email]
 
-    # 🏠 1. SAYFA: ANA SAYFA (CV ANALİZ)
+    # 🏠 1. SAYFA: ANA SAYFA (CV ANALİZ) - ŞİMDİ SADE VE TERTEMİZ
     if sayfa == "🏠 Ana Sayfa (CV Analiz)":
         col_left, col_right = res_st.columns([1, 1.5])
 
@@ -170,19 +182,12 @@ else:
                 
                 durum_clean = ana_secilen_durum.split(" ")[1] 
                 
-                # 🔥 DİNAMİK E-POSTA ÖNİZLEME ALANI
-                res_st.write("**✉️ Otomatik Oluşturulan Aday Bildirim E-postası:**")
-                aday_adi = res_st.session_state.current_analysis.get('Ad Soyad', 'Aday')
-                sablon_metin = generate_email_template(aday_adi, durum_clean)
-                res_st.markdown(f'<div class="email-box">{sablon_metin}</div>', unsafe_allow_html=True)
-                
                 if res_st.button("💾 Havuza Güvenle Kaydet", type="secondary"):
                     final_cv = res_st.session_state.current_analysis.copy()
                     final_cv["id"] = len(res_st.session_state.mock_cvs_db) + 1
                     final_cv["owner_email"] = res_st.session_state.user_email
                     final_cv["kategori"] = ana_secilen_kat
                     final_cv["durum"] = durum_clean
-                    final_cv["sablon_eposta"] = sablon_metin # E-postayı da adayın yanına kaydediyoruz
                     final_cv["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
                     res_st.session_state.mock_cvs_db.append(final_cv)
@@ -190,7 +195,7 @@ else:
                     if u_info['paket_turu'] != "Sınırsız (Kurumsal)":
                         res_st.session_state.mock_users_db[res_st.session_state.user_email]["kalan_hak"] -= 1
                     
-                    res_st.success(f"💾 CV ve Hazır E-posta başarıyla kaydedildi!")
+                    res_st.success(f"💾 CV başarıyla '{ana_secilen_kat}' kategorisine kaydedildi!")
                     res_st.session_state.current_analysis = None
                     time.sleep(1)
                     res_st.rerun()
@@ -209,7 +214,7 @@ else:
             else:
                 res_st.info("Sol taraftan bir dosya yükleyip 'Analiz Et' butonuna bastığınızda detaylar burada görünecek.")
 
-    # 📁 2. SAYFA: CV'LER (GEÇMİŞTEKİ E-POSTALARI GÖRME)
+    # 📁 2. SAYFA: CV'LER (İSTEĞE BAĞLI BUTONLA E-POSTA ÜRETME ALANI)
     elif sayfa == "📁 CVler (Yönetim & Kategori)":
         res_st.subheader("📁 Özelleştirilmiş CV Deposu")
         
@@ -253,42 +258,50 @@ else:
                     res_st.write(f"**📧 E-posta:** {kayit.get('E-posta')}")
                     res_st.write(f"**📍 Adres:** {kayit.get('Adres')}")
                     
-                    # 🔥 GEÇMİŞ PANELİNDE E-POSTA GÖSTERME ALANI
-                    if kayit.get("sablon_eposta"):
-                        res_st.write("---")
-                        res_st.write("**✉️ Bu Aday İçin Hazırlanmış E-posta Taslağı:**")
-                        res_st.markdown(f'<div class="email-box">{kayit.get("sablon_eposta")}</div>', unsafe_allow_html=True)
-                    
                     res_st.write("---")
                     res_st.write("**🚥 Durumu Güncelle:**")
                     col_b1, col_b2, col_b3, col_b4 = res_st.columns(4)
                     with col_b1:
                         if res_st.button("🟢 Olumlu", key=f"btn_ol__{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]:
-                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumlu"
-                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Olumlu")
+                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumlu"
                             res_st.rerun()
                     with col_b2:
                         if res_st.button("🟡 Nötr", key=f"btn_no_{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]:
-                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Nötr"
-                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Nötr")
+                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Nötr"
                             res_st.rerun()
                     with col_b3:
                         if res_st.button("🔴 Olumsuz", key=f"btn_sz_{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]:
-                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumsuz"
-                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Olumsuz")
+                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumsuz"
                             res_st.rerun()
                     with col_b4:
                         if res_st.button("🔵 Yeni", key=f"btn_yn_{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]:
-                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Yeni"
-                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Yeni")
+                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Yeni"
+                            res_st.rerun()
+
+                    # 🔥 YENİ ÖZELLİK: İSTEĞE BAĞLI E-POSTA OLUŞTURMA BUTONU
+                    res_st.write("---")
+                    res_st.write("**✉️ Aday İletişim Yönetimi:**")
+                    
+                    # Her adaya özel tetikleyici bir state anahtarı oluşturuyoruz
+                    state_key = f"email_generated_{kayit['id']}"
+                    if state_key not in res_st.session_state:
+                        res_st.session_state[state_key] = False
+                        
+                    if res_st.button(f"✨ Bu Aday İçin E-posta Taslağı Üret", key=f"generate_btn_{kayit['id']}"):
+                        res_st.session_state[state_key] = True
+                    
+                    # Eğer kullanıcı butona bastıysa taslak ekranda açılır
+                    if res_st.session_state[state_key]:
+                        sablon_metin = generate_email_template(kayit.get('Ad Soyad'), kayit.get('durum'))
+                        res_st.markdown(f'<div class="email-box">{sablon_metin}</div>', unsafe_allow_html=True)
+                        
+                        # Kapatma seçeneği
+                        if res_st.button("❌ Taslağı Kapat", key=f"close_email_{kayit['id']}"):
+                            res_st.session_state[state_key] = False
                             res_st.rerun()
 
                     res_st.write("---")
