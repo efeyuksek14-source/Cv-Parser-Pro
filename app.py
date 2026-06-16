@@ -11,6 +11,7 @@ res_st.markdown("""
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
     .result-card { background-color: #ffffff; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
     .category-box { background-color: #e2e8f0; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; color: #475569; display: inline-block; margin-bottom: 10px; margin-right: 5px;}
+    .email-box { background-color: #f8fafc; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 8px; font-family: monospace; white-space: pre-wrap; font-size: 13px; color: #334155; margin-top: 10px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -35,7 +36,7 @@ if 'mock_cvs_db' not in res_st.session_state:
     res_st.session_state.mock_cvs_db = [
         {
             "id": 1,
-            "Ad Soyad": "Aday: AHMET YILMAZ",
+            "Ad Soyad": "AHMET YILMAZ",
             "Telefon": "+90 532 111 22 33",
             "E-posta": "ahmet@example.com",
             "Adres": "Kadıköy, İstanbul",
@@ -44,20 +45,8 @@ if 'mock_cvs_db' not in res_st.session_state:
             "owner_email": "efe@ceyiznet.com",
             "kategori": "Stajyerler",
             "durum": "Olumlu",
+            "sablon_eposta": "Sayın Ahmet Yılmaz,\n\nÖzgeçmişiniz incelenmiş ve olumlu bulunmuştur. Sizi mülakata davet etmek isteriz...",
             "kayit_tarihi": "2026-06-16 10:00:00"
-        },
-        {
-            "id": 2,
-            "Ad Soyad": "Aday: ELİF KAYA",
-            "Telefon": "+90 544 333 44 55",
-            "E-posta": "elif@example.com",
-            "Adres": "Beşiktaş, İstanbul",
-            "Deneyim": ["Ceyiznet - E-Ticaret Sorumlusu"],
-            "Yetenekler": "Shopify, Trendyol Entegrasyon",
-            "owner_email": "efe@ceyiznet.com",
-            "kategori": "Genel",
-            "durum": "Nötr",
-            "kayit_tarihi": "2026-06-16 10:30:00"
         }
     ]
 
@@ -71,13 +60,24 @@ if 'current_analysis' not in res_st.session_state:
 def analyze_cv_mock(filename):
     time.sleep(0.4)
     return {
-        "Ad Soyad": f"Aday: {filename.split('.')[0].upper()}",
+        "Ad Soyad": f"{filename.split('.')[0].replace('_', ' ').replace('-', ' ').upper()}",
         "Telefon": "+90 532 999 88 77",
         "E-posta": "ornek_aday@ceyiznet.com",
         "Adres": "Maltepe, İstanbul",
         "Deneyim": ["Örnek Şirket - Pozisyon Bilgisi (2 Yıl)"],
         "Yetenekler": "E-Ticaret, Python, Analiz"
     }
+
+# 📜 OTOMATİK E-POSTA ŞABLON MOTORU (Yapay zekanın üreteceği taslaklar)
+def generate_email_template(aday_isim, durum):
+    if durum == "Olumlu":
+        return f"Konu: İş Başvurusu Sonucu - Mülakat Daveti\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz özgeçmiş başvurusu ekiplerimiz tarafından detaylıca incelenmiş ve tecrübeleriniz pozisyonumuz için oldukça olumlu bulunmuştur.\n\nSizinle daha yakından tanışmak ve pozisyon detaylarını görüşmek üzere en kısa sürede bir online mülakat planlamak istiyoruz. Uygun olduğunuz gün ve saat aralıklarını bu e-postayı yanıtlayarak bizimle paylaşabilir misiniz?\n\nSürecimize gösterdiğiniz ilgi için teşekkür eder, iyi günler dileriz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+    elif durum == "Olumsuz":
+        return f"Konu: İş Başvurusu Sonucu Bilgilendirmesi\n\nSayın {aday_isim},\n\nŞirketimize göstermiş olduğunuz ilgi ve yapmış olduğunuz iş başvurusu için çok teşekkür ederiz.\n\nNitelikli başvuruların yoğunluğu nedeniyle seçim yapmakta zorlandığımızı belirtmek isteriz. Özgeçmişiniz detaylıca incelenmiş ancak bu pozisyon için aranan spesifik kriterler doğrultusunda şu aşamada sürecimize farklı bir aday ile devam etme kararı alınmıştır.\n\nÖzgeçmişiniz, gelecekte açılabilecek diğer uygun pozisyonlar için veri tabanımızda saklanacaktır. Kariyer yolculuğunuzda başarılar dileriz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+    elif durum == "Nötr":
+        return f"Konu: İş Başvurusu Durumu - Değerlendirme Süreci\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz iş başvurusu İnsan Kaynakları havuzumuza başarıyla kaydedilmiştir.\n\nŞu an için ilgili pozisyona ait değerlendirmelerimiz devam etmekte olup, sürecin tamamlanmasının ardından tarafınıza tekrar geri dönüş sağlanacaktır. Bu süreçte göstermiş olduğunuz sabır ve ilgi için teşekkür ederiz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+    else:
+        return "Lütfen aday durumunu seçerek otomatik e-posta taslağını oluşturun."
 
 # ----------------------------------------
 # 🚪 YAN PANEL SİSTEMİ
@@ -164,11 +164,17 @@ else:
                 
                 ana_secilen_durum = res_st.radio(
                     "🚥 Aday Değerlendirme Durumu:",
-                    ["🔵 Yeni / Belirsiz", "🟢 Olumlu", "🟡 Nötr", "🔴 Olumsuz"],
+                    ["🔵 Yeni", "🟢 Olumlu", "🟡 Nötr", "🔴 Olumsuz"],
                     horizontal=True
                 )
                 
                 durum_clean = ana_secilen_durum.split(" ")[1] 
+                
+                # 🔥 DİNAMİK E-POSTA ÖNİZLEME ALANI
+                res_st.write("**✉️ Otomatik Oluşturulan Aday Bildirim E-postası:**")
+                aday_adi = res_st.session_state.current_analysis.get('Ad Soyad', 'Aday')
+                sablon_metin = generate_email_template(aday_adi, durum_clean)
+                res_st.markdown(f'<div class="email-box">{sablon_metin}</div>', unsafe_allow_html=True)
                 
                 if res_st.button("💾 Havuza Güvenle Kaydet", type="secondary"):
                     final_cv = res_st.session_state.current_analysis.copy()
@@ -176,6 +182,7 @@ else:
                     final_cv["owner_email"] = res_st.session_state.user_email
                     final_cv["kategori"] = ana_secilen_kat
                     final_cv["durum"] = durum_clean
+                    final_cv["sablon_eposta"] = sablon_metin # E-postayı da adayın yanına kaydediyoruz
                     final_cv["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
                     res_st.session_state.mock_cvs_db.append(final_cv)
@@ -183,7 +190,7 @@ else:
                     if u_info['paket_turu'] != "Sınırsız (Kurumsal)":
                         res_st.session_state.mock_users_db[res_st.session_state.user_email]["kalan_hak"] -= 1
                     
-                    res_st.success(f"💾 CV başarıyla '{ana_secilen_kat}' kategorisine kaydedildi!")
+                    res_st.success(f"💾 CV ve Hazır E-posta başarıyla kaydedildi!")
                     res_st.session_state.current_analysis = None
                     time.sleep(1)
                     res_st.rerun()
@@ -202,7 +209,7 @@ else:
             else:
                 res_st.info("Sol taraftan bir dosya yükleyip 'Analiz Et' butonuna bastığınızda detaylar burada görünecek.")
 
-    # 📁 2. SAYFA: CV'LER (SADE SATIR VE SONUNDA RENKLİ DAİRE)
+    # 📁 2. SAYFA: CV'LER (GEÇMİŞTEKİ E-POSTALARI GÖRME)
     elif sayfa == "📁 CVler (Yönetim & Kategori)":
         res_st.subheader("📁 Özelleştirilmiş CV Deposu")
         
@@ -238,36 +245,50 @@ else:
                 emoji_map = {"Yeni": "🔵", "Olumlu": "🟢", "Nötr": "🟡", "Olumsuz": "🔴"}
                 current_emoji = emoji_map.get(kayit.get("durum", "Yeni"), "🔵")
                 
-                baslik = f"📄 {kayit.get('Ad Soyad')} | Durum: {kayit.get('durum')} | Tarih: {kayit.get('kayit_tarihi')} {current_emoji}"
+                baslik = f"📄 {kayit.get('Ad Soyad')} | Durum: {kayit.get('durum')} {current_emoji}"
                 
                 with res_st.expander(baslik):
                     res_st.markdown(f'<div class="category-box">📂 Kategori: {kayit.get("kategori")}</div>', unsafe_allow_html=True)
                     res_st.write(f"**📞 Telefon:** {kayit.get('Telefon')}")
                     res_st.write(f"**📧 E-posta:** {kayit.get('E-posta')}")
                     res_st.write(f"**📍 Adres:** {kayit.get('Adres')}")
-                    res_st.write("---")
                     
-                    res_st.write("**🚥 Durumu Buradan da Güncelleyebilirsiniz:**")
+                    # 🔥 GEÇMİŞ PANELİNDE E-POSTA GÖSTERME ALANI
+                    if kayit.get("sablon_eposta"):
+                        res_st.write("---")
+                        res_st.write("**✉️ Bu Aday İçin Hazırlanmış E-posta Taslağı:**")
+                        res_st.markdown(f'<div class="email-box">{kayit.get("sablon_eposta")}</div>', unsafe_allow_html=True)
+                    
+                    res_st.write("---")
+                    res_st.write("**🚥 Durumu Güncelle:**")
                     col_b1, col_b2, col_b3, col_b4 = res_st.columns(4)
                     with col_b1:
                         if res_st.button("🟢 Olumlu", key=f"btn_ol__{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumlu"
+                                if cv["id"] == kayit["id"]:
+                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumlu"
+                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Olumlu")
                             res_st.rerun()
                     with col_b2:
                         if res_st.button("🟡 Nötr", key=f"btn_no_{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Nötr"
+                                if cv["id"] == kayit["id"]:
+                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Nötr"
+                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Nötr")
                             res_st.rerun()
                     with col_b3:
                         if res_st.button("🔴 Olumsuz", key=f"btn_sz_{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumsuz"
+                                if cv["id"] == kayit["id"]:
+                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Olumsuz"
+                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Olumsuz")
                             res_st.rerun()
                     with col_b4:
                         if res_st.button("🔵 Yeni", key=f"btn_yn_{kayit['id']}"):
                             for idx, cv in enumerate(res_st.session_state.mock_cvs_db):
-                                if cv["id"] == kayit["id"]: res_st.session_state.mock_cvs_db[idx]["durum"] = "Yeni"
+                                if cv["id"] == kayit["id"]:
+                                    res_st.session_state.mock_cvs_db[idx]["durum"] = "Yeni"
+                                    res_st.session_state.mock_cvs_db[idx]["sablon_eposta"] = generate_email_template(kayit.get('Ad Soyad'), "Yeni")
                             res_st.rerun()
 
                     res_st.write("---")
