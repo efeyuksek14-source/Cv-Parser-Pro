@@ -2,5 +2,5 @@ streamlit
 PyPDF2
 python-docx
 google-genai
-pymongo
+pymongo[srv]
 dnspython
