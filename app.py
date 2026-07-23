@@ -62,7 +62,11 @@ def extract_text_from_pdf(uploaded_file):
     return text
 
 def analyze_cv_real(file_text):
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Model ismi güncellendi ve yedekli hale getirildi
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+    except:
+        model = genai.GenerativeModel('gemini-2.0-flash')
     
     prompt = f"""
     Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
@@ -232,7 +236,7 @@ if not res_st.session_state.logged_in:
             
             * **Özelleştirilmiş İK Portalı:** Bireysel veya Kurumsal hesap seçeneği.
             * **Şirket ve Fatura Entegrasyonu:** Şirketiniz için vergi bilgileriyle resmi profil.
-            * **Gemini 1.5 Flash:** Tam yapay zeka entegrasyonu ile dakikalar değil saniyeler içinde CV tarama.
+            * **Gemini Yapay Zeka:** Tam yapay zeka entegrasyonu ile dakikalar değil saniyeler içinde CV tarama.
             * **Kesintisiz MongoDB Bulut:** Verileriniz güvende, tüm ekibiniz için erişilebilir.
         """)
 
