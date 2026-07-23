@@ -1,6 +1,6 @@
 streamlit
-PyPDF2
+pypdf
 python-docx
-google-genai
+google-generativeai
 pymongo[srv]
 dnspython
