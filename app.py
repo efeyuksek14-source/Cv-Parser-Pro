@@ -7,7 +7,7 @@ from pymongo import MongoClient
 import google.generativeai as genai
 from pypdf import PdfReader
 
-# Sayfa Ayarları
+# 1. Arayüz Tasarımı ve Sayfa Ayarları
 res_st.set_page_config(page_title="ParserFlow - Akıllı ATS", page_icon="🚀", layout="wide")
 
 res_st.markdown("""
@@ -22,7 +22,9 @@ res_st.markdown("""
 
 res_st.title("🚀 ParserFlow - Yapay Zeka Destekli Gelişmiş CV Yönetim Merkezi")
 
-# MongoDB Bağlantısı
+# ----------------------------------------
+# 🗄️ MONGODB VE GEMINI API BAĞLANTILARI
+# ----------------------------------------
 @res_st.cache_resource
 def init_connection():
     return MongoClient(res_st.secrets["mongo_uri"])
@@ -33,21 +35,23 @@ try:
     users_col = db["users"]
     cvs_col = db["cvs"]
 except Exception as e:
-    res_st.error("⚠️ Veritabanı bağlantısı kurulamadı. Secrets ayarlarını kontrol edin.")
+    res_st.error("⚠️ Veritabanı bağlantısı kurulamadı. Lütfen Streamlit Secrets ayarlarındaki mongo_uri alanını kontrol edin.")
     res_st.stop()
 
 # Gemini API Yapılandırması
 try:
     genai.configure(api_key=res_st.secrets["GEMINI_API_KEY"])
 except Exception as e:
-    res_st.error("⚠️ Gemini API Key bulunamadı.")
+    res_st.error("⚠️ Gemini API Key bulunamadı. Lütfen Streamlit Secrets ayarlarını kontrol edin.")
 
+# --- GÜVENLİK İÇİN ŞİFRE HASHLEME FONKSİYONLARI ---
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def check_hashes(password, hashed_text):
     return make_hashes(password) == hashed_text
 
+# --- PDF METİN OKUMA VE GEMINI ANALİZ MOTORU ---
 def extract_text_from_pdf(uploaded_file):
     reader = PdfReader(uploaded_file)
     text = ""
@@ -59,6 +63,7 @@ def extract_text_from_pdf(uploaded_file):
 
 def analyze_cv_real(file_text):
     model = genai.GenerativeModel('gemini-1.5-flash')
+    
     prompt = f"""
     Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
     Sadece geçerli bir JSON objesi döndür, başka hiçbir açıklama veya markdown bloğu (```json gibi) ekleme.
@@ -76,8 +81,10 @@ def analyze_cv_real(file_text):
     CV Metni:
     {file_text}
     """
+    
     response = model.generate_content(prompt)
     raw_response = response.text.strip().replace("```json", "").replace("```", "")
+    
     try:
         data = json.loads(raw_response)
     except:
@@ -101,6 +108,7 @@ def generate_email_template(aday_isim, durum):
     else:
         return f"Konu: Başvurunuz Hakkında\n\nSayın {aday_isim},\n\nİş başvurunuz sistemimize ulaştı.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
 
+# --- GEÇİCİ DURUM HAFIZALARI ---
 if 'logged_in' not in res_st.session_state:
     res_st.session_state.logged_in = False
 if 'user_email' not in res_st.session_state:
@@ -108,28 +116,56 @@ if 'user_email' not in res_st.session_state:
 if 'current_analysis' not in res_st.session_state:
     res_st.session_state.current_analysis = None
 
-# GİRİŞ / KAYIT EKRANI
+# ----------------------------------------
+# 🚪 GELİŞMİŞ B2B GİRİŞ YAP / KAYIT OL EKRANI
+# ----------------------------------------
 if not res_st.session_state.logged_in:
-    col_auth_left, col_auth_right = res_st.columns([1, 1.2])
+    col_auth_left, col_auth_right = res_st.columns([1.2, 1])
     
     with col_auth_left:
-        res_st.subheader("🔐 ParserFlow Erişim Paneli")
-        auth_mode = res_st.radio("Yapmak İstediğiniz İşlem:", ["Giriş Yap", "Kayıt Ol (Ücretsiz Dene)"])
+        res_st.subheader("🔐 ParserFlow Kurumsal Portal")
+        auth_mode = res_st.radio("İşlem Seçiniz:", ["Giriş Yap", "Kayıt Ol (Yeni Hesap)"], horizontal=True)
         
-        email = res_st.text_input("E-posta Adresi").strip()
-        password = res_st.text_input("Şifre", type="password")
-        
-        if auth_mode == "Kayıt Ol (Ücretsiz Dene)":
-            paket_secimi = res_st.selectbox("Satın Alınacak Giriş Paketi", [
-                "Başlangıç Paketi (10$ - 100 CV)", 
-                "Profesyonel Paket (15$ - 500 CV)", 
-                "Kurumsal Paket (25$ - Sınırsız CV)"
+        if auth_mode == "Kayıt Ol (Yeni Hesap)":
+            res_st.markdown("##### 📝 Hesap Tipi & Kullanıcı Bilgileri")
+            
+            hesap_turu = res_st.selectbox("Hesap Türü Seçin:", ["Bireysel Kullanıcı", "Kurumsal / Şirket"])
+            
+            c1, c2 = res_st.columns(2)
+            with c1:
+                ad_soyad = res_st.text_input("Ad Soyad *").strip()
+                email = res_st.text_input("Kurumsal E-posta Adresi *").strip().lower()
+            with c2:
+                telefon = res_st.text_input("Telefon Numarası").strip()
+                password = res_st.text_input("Şifre Belirleyin *", type="password")
+
+            sirket_unvani = ""
+            vergi_no = ""
+            vergi_dairesi = ""
+            sektor = ""
+
+            if hesap_turu == "Kurumsal / Şirket":
+                res_st.markdown("##### 🏢 Şirket & Fatura Bilgileri")
+                sc1, sc2 = res_st.columns(2)
+                with sc1:
+                    sirket_unvani = res_st.text_input("Şirket Unvanı *").strip()
+                    vergi_dairesi = res_st.text_input("Vergi Dairesi").strip()
+                with sc2:
+                    vergi_no = res_st.text_input("Vergi Numarası / VKN").strip()
+                    sektor = res_st.selectbox("Sektör", ["Lojistik / Denizcilik", "Bilişim / Teknoloji", "E-Ticaret / Mağazacılık", "İnsan Kaynakları", "Üretim / Sanayi", "Diğer"])
+
+            res_st.markdown("##### 💳 Abonelik Paketi Seçimi")
+            paket_secimi = res_st.selectbox("Başlangıç Paketi", [
+                "Başlangıç Paketi (10$ / Ay - 100 CV)", 
+                "Profesyonel Paket (15$ / Ay - 500 CV)", 
+                "Kurumsal Paket (25$ / Ay - Sınırsız CV)"
             ])
-            if res_st.button("Hesabımı Oluştur"):
-                if email and password:
+            
+            if res_st.button("🚀 Hesabımı Oluştur ve Başla", type="primary"):
+                if email and password and ad_soyad and (hesap_turu == "Bireysel Kullanıcı" or sirket_unvani):
                     existing_user = users_col.find_one({"email": email})
                     if existing_user:
-                        res_st.error("Bu e-posta adresi zaten kayıtlı!")
+                        res_st.error("⚠️ Bu e-posta adresi zaten sisteme kayıtlı!")
                     else:
                         hak = 100 if "10$" in paket_secimi else (500 if "15$" in paket_secimi else 9999)
                         p_isim = "Başlangıç" if "10$" in paket_secimi else ("Profesyonel" if "15$" in paket_secimi else "Sınırsız (Kurumsal)")
@@ -137,20 +173,31 @@ if not res_st.session_state.logged_in:
                         
                         new_user_data = {
                             "email": email,
-                            "password": make_hashes(password), 
+                            "password": make_hashes(password),
+                            "ad_soyad": ad_soyad,
+                            "telefon": telefon,
+                            "hesap_turu": hesap_turu,
+                            "sirket_unvani": sirket_unvani,
+                            "vergi_no": vergi_no,
+                            "vergi_dairesi": vergi_dairesi,
+                            "sektor": sektor,
                             "paket_turu": p_isim, 
                             "abonelik_durumu": "aktif", 
                             "abonelik_bitis": bitis_tarihi, 
                             "kalan_hak": hak,
                             "toplam_hak": hak,
-                            "kategoriler": ["Genel"]
+                            "kategoriler": ["Genel"],
+                            "kayit_tarihi": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         }
                         users_col.insert_one(new_user_data)
-                        res_st.success("🎉 Kayıt başarılı! MongoDB veritabanına eklendiniz. 'Giriş Yap' sekmesinden giriş yapabilirsiniz.")
+                        res_st.success("🎉 Kayıt başarıyla tamamlandı! MongoDB'ye işlendi. Şimdi 'Giriş Yap' sekmesinden sisteme girebilirsiniz.")
                 else:
-                    res_st.warning("Lütfen boş alanları doldurun.")
+                    res_st.warning("⚠️ Lütfen zorunlu alanları (*) doldurunuz.")
                     
         elif auth_mode == "Giriş Yap":
+            email = res_st.text_input("E-posta Adresi").strip().lower()
+            password = res_st.text_input("Şifre", type="password")
+            
             if res_st.button("Sisteme Giriş Yap", type="primary"):
                 user_record = users_col.find_one({"email": email})
                 if user_record and check_hashes(password, user_record["password"]):
@@ -158,22 +205,29 @@ if not res_st.session_state.logged_in:
                     res_st.session_state.user_email = email
                     res_st.rerun()
                 else:
-                    res_st.error("Hatalı e-posta veya şifre!")
+                    res_st.error("❌ Hatalı e-posta veya şifre!")
                     
     with col_auth_right:
         res_st.markdown("""
-            ### Neden ParserFlow?
-            * **Gerçek Yapay Zeka:** Google Gemini altyapısı ile CV'leri saniyeler içinde analiz edin.
-            * **Kalıcı Bulut Depolama:** MongoDB entegrasyonu sayesinde verileriniz her cihazdan erişilebilir.
+            ### 💼 ParserFlow SaaS Platformu
+            
+            * **Özelleştirilmiş İK Portalı:** Bireysel veya Kurumsal hesap seçeneği.
+            * **Şirket ve Fatura Entegrasyonu:** Şirketiniz için vergi bilgileriyle resmi profil.
+            * **Gemini 1.5 Flash:** Tam yapay zeka entegrasyonu ile dakikalar değil saniyeler içinde CV tarama.
+            * **Kesintisiz MongoDB Bulut:** Verileriniz güvende, tüm ekibiniz için erişilebilir.
         """)
 
-# ANA SİSTEM
+# ----------------------------------------
+# 🖥️ ANA SİSTEM (GİRİŞ YAPILDIYSA)
+# ----------------------------------------
 else:
     u_info = users_col.find_one({"email": res_st.session_state.user_email})
     
     with res_st.sidebar:
-        res_st.subheader("👤 Hesap Bilgileri")
-        res_st.write(f"**Kullanıcı:** {res_st.session_state.user_email}")
+        res_st.subheader("👤 Profil Bilgileri")
+        res_st.write(f"**Kullanıcı:** {u_info.get('ad_soyad', res_st.session_state.user_email)}")
+        if u_info.get('sirket_unvani'):
+            res_st.write(f"🏢 **Şirket:** {u_info.get('sirket_unvani')}")
         res_st.write(f"**Abonelik:** `{u_info['paket_turu']}`")
         
         if u_info['paket_turu'] == "Sınırsız (Kurumsal)":
