@@ -1,4 +1,3 @@
-
 import streamlit as res_st
 import datetime
 import time
@@ -75,8 +74,12 @@ def analyze_cv_real(file_text):
         "Telefon": "Telefon numarası veya Bulunamadı",
         "E-posta": "E-posta adresi veya Bulunamadı",
         "Adres": "Şehir/Adres bilgisi veya Bulunamadı",
-        "Deneyim": ["Şirket 1 - Pozisyon (Yıl)", "Şirket 2 - Pozisyon"],
-        "Yetenekler": "Öne çıkan yetenekler ve teknolojiler"
+        "Toplam Tecrübe": "Tahmini veya belirtilen toplam tecrübe süresi (Örn: 3 Yıl)",
+        "Deneyim": ["Son iş tecrübeleri (En fazla 5 iş tecrübesi listele: Şirket - Pozisyon - Tarih Aralığı)"],
+        "Eğitim": ["Okul/Üniversite - Bölüm - Mezuniyet Yılı"],
+        "Diller": ["Bilinen yabancı diller ve seviyeleri"],
+        "Sertifikalar": ["Sahip olunan sertifikalar, kurslar ve belgeler"],
+        "Yetenekler": "Öne çıkan teknik yetenekler, yazılımlar ve beceriler"
     }}
 
     CV Metni:
@@ -94,7 +97,11 @@ def analyze_cv_real(file_text):
             "Telefon": "Bulunamadı",
             "E-posta": "Bulunamadı",
             "Adres": "Bulunamadı",
+            "Toplam Tecrübe": "Bulunamadı",
             "Deneyim": [raw_response[:100]],
+            "Eğitim": ["Bulunamadı"],
+            "Diller": ["Bulunamadı"],
+            "Sertifikalar": ["Bulunamadı"],
             "Yetenekler": "Genel"
         }
     return data
@@ -307,21 +314,50 @@ else:
             if res_st.session_state.current_analysis is not None:
                 res = res_st.session_state.current_analysis
                 res_st.markdown('<div class="result-card">', unsafe_allow_html=True)
-                res_st.markdown("### 👤 Ayıklanan Bilgiler")
+                res_st.markdown("### 👤 Ayıklanan Detaylı Profil")
                 res_st.write(f"**Adı Soyadı:** {res.get('Ad Soyad')}")
                 res_st.write(f"**📞 Telefon:** {res.get('Telefon')}")
                 res_st.write(f"**📧 E-posta:** {res.get('E-posta')}")
                 res_st.write(f"**📍 Adres:** {res.get('Adres')}")
-                res_st.write(f"**🛠️ Yetenekler:** {res.get('Yetenekler')}")
-                res_st.write("**💼 Deneyimler:**")
+                res_st.write(f"**⏳ Toplam Tecrübe:** {res.get('Toplam Tecrübe', 'Belirtilmedi')}")
+                
+                res_st.write("---")
+                res_st.write("**💼 Son İş Deneyimleri (Max 5):**")
                 if isinstance(res.get('Deneyim'), list):
                     for d in res.get('Deneyim'):
                         res_st.write(f"- {d}")
                 else:
                     res_st.write(res.get('Deneyim'))
+                    
+                res_st.write("---")
+                res_st.write("**🎓 Eğitim Geçmişi:**")
+                if isinstance(res.get('Eğitim'), list):
+                    for e in res.get('Eğitim'):
+                        res_st.write(f"- {e}")
+                else:
+                    res_st.write(res.get('Eğitim'))
+
+                res_st.write("---")
+                res_st.write("**🌐 Yabancı Diller:**")
+                if isinstance(res.get('Diller'), list):
+                    for dil in res.get('Diller'):
+                        res_st.write(f"- {dil}")
+                else:
+                    res_st.write(res.get('Diller'))
+
+                res_st.write("---")
+                res_st.write("**📜 Sertifikalar & Kurslar:**")
+                if isinstance(res.get('Sertifikalar'), list):
+                    for s in res.get('Sertifikalar'):
+                        res_st.write(f"- {s}")
+                else:
+                    res_st.write(res.get('Sertifikalar'))
+
+                res_st.write("---")
+                res_st.write(f"**🛠️ Beceriler & Teknolojiler:** {res.get('Yetenekler')}")
                 res_st.markdown('</div>', unsafe_allow_html=True)
             else:
-                res_st.info("Yapay zeka analiz sonuçları burada görünecek.")
+                res_st.info("Yapay zeka analiz sonuçları detaylı olarak burada görünecek.")
 
     elif sayfa == "📁 CVler (Yönetim & Kategori)":
         res_st.subheader("📁 Özelleştirilmiş Bulut CV Deposu")
@@ -367,7 +403,38 @@ else:
                     res_st.write(f"**📞 Telefon:** {kayit.get('Telefon')}")
                     res_st.write(f"**📧 E-posta:** {kayit.get('E-posta')}")
                     res_st.write(f"**📍 Adres:** {kayit.get('Adres')}")
-                    res_st.write(f"**🛠️ Yetenekler:** {kayit.get('Yetenekler')}")
+                    res_st.write(f"**⏳ Toplam Tecrübe:** {kayit.get('Toplam Tecrübe', 'Belirtilmedi')}")
+                    
+                    res_st.write("---")
+                    res_st.write("**💼 Deneyimler:**")
+                    if isinstance(kayit.get('Deneyim'), list):
+                        for d in kayit.get('Deneyim'):
+                            res_st.write(f"- {d}")
+                    else:
+                        res_st.write(kayit.get('Deneyim'))
+
+                    res_st.write("**🎓 Eğitim:**")
+                    if isinstance(kayit.get('Eğitim'), list):
+                        for e in kayit.get('Eğitim'):
+                            res_st.write(f"- {e}")
+                    else:
+                        res_st.write(kayit.get('Eğitim'))
+
+                    res_st.write("**🌐 Yabancı Diller:**")
+                    if isinstance(kayit.get('Diller'), list):
+                        for dil in kayit.get('Diller'):
+                            res_st.write(f"- {dil}")
+                    else:
+                        res_st.write(kayit.get('Diller'))
+
+                    res_st.write("**📜 Sertifikalar:**")
+                    if isinstance(kayit.get('Sertifikalar'), list):
+                        for s in kayit.get('Sertifikalar'):
+                            res_st.write(f"- {s}")
+                    else:
+                        res_st.write(kayit.get('Sertifikalar'))
+
+                    res_st.write(f"**🛠️ Beceriler:** {kayit.get('Yetenekler')}")
                     
                     res_st.write("---")
                     res_st.write("**🚥 Durumu Değiştir:**")
