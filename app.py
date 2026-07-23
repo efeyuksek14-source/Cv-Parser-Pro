@@ -1,3 +1,4 @@
+
 import streamlit as res_st
 import datetime
 import time
@@ -35,14 +36,14 @@ try:
     users_col = db["users"]
     cvs_col = db["cvs"]
 except Exception as e:
-    res_st.error("⚠️ Veritabanı bağlantısı kurulamadı. Lütfen Streamlit Secrets ayarlarındaki mongo_uri alanını kontrol edin.")
+    res_st.error(f"⚠️ Veritabanı bağlantısı kurulamadı: {e}")
     res_st.stop()
 
 # Gemini API Yapılandırması
 try:
     genai.configure(api_key=res_st.secrets["GEMINI_API_KEY"])
 except Exception as e:
-    res_st.error("⚠️ Gemini API Key bulunamadı. Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+    res_st.error(f"⚠️ Gemini API Key hatası: {e}")
 
 # --- GÜVENLİK İÇİN ŞİFRE HASHLEME FONKSİYONLARI ---
 def make_hashes(password):
@@ -134,10 +135,10 @@ if not res_st.session_state.logged_in:
             c1, c2 = res_st.columns(2)
             with c1:
                 ad_soyad = res_st.text_input("Ad Soyad *").strip()
-                email = res_st.text_input("Kurumsal E-posta Adresi *").strip().lower()
+                email = res_st.text_input("Kurumsal E-posta Adresi *", key="reg_email").strip().lower()
             with c2:
                 telefon = res_st.text_input("Telefon Numarası").strip()
-                password = res_st.text_input("Şifre Belirleyin *", type="password")
+                password = res_st.text_input("Şifre Belirleyin *", type="password", key="reg_pass")
 
             sirket_unvani = ""
             vergi_no = ""
@@ -163,49 +164,60 @@ if not res_st.session_state.logged_in:
             
             if res_st.button("🚀 Hesabımı Oluştur ve Başla", type="primary"):
                 if email and password and ad_soyad and (hesap_turu == "Bireysel Kullanıcı" or sirket_unvani):
-                    existing_user = users_col.find_one({"email": email})
-                    if existing_user:
-                        res_st.error("⚠️ Bu e-posta adresi zaten sisteme kayıtlı!")
-                    else:
-                        hak = 100 if "10$" in paket_secimi else (500 if "15$" in paket_secimi else 9999)
-                        p_isim = "Başlangıç" if "10$" in paket_secimi else ("Profesyonel" if "15$" in paket_secimi else "Sınırsız (Kurumsal)")
-                        bitis_tarihi = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d")
-                        
-                        new_user_data = {
-                            "email": email,
-                            "password": make_hashes(password),
-                            "ad_soyad": ad_soyad,
-                            "telefon": telefon,
-                            "hesap_turu": hesap_turu,
-                            "sirket_unvani": sirket_unvani,
-                            "vergi_no": vergi_no,
-                            "vergi_dairesi": vergi_dairesi,
-                            "sektor": sektor,
-                            "paket_turu": p_isim, 
-                            "abonelik_durumu": "aktif", 
-                            "abonelik_bitis": bitis_tarihi, 
-                            "kalan_hak": hak,
-                            "toplam_hak": hak,
-                            "kategoriler": ["Genel"],
-                            "kayit_tarihi": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        }
-                        users_col.insert_one(new_user_data)
-                        res_st.success("🎉 Kayıt başarıyla tamamlandı! MongoDB'ye işlendi. Şimdi 'Giriş Yap' sekmesinden sisteme girebilirsiniz.")
+                    try:
+                        existing_user = users_col.find_one({"email": email})
+                        if existing_user:
+                            res_st.error("⚠️ Bu e-posta adresi zaten sisteme kayıtlı!")
+                        else:
+                            hak = 100 if "10$" in paket_secimi else (500 if "15$" in paket_secimi else 9999)
+                            p_isim = "Başlangıç" if "10$" in paket_secimi else ("Profesyonel" if "15$" in paket_secimi else "Sınırsız (Kurumsal)")
+                            bitis_tarihi = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+                            
+                            new_user_data = {
+                                "email": email,
+                                "password": make_hashes(password),
+                                "ad_soyad": ad_soyad,
+                                "telefon": telefon,
+                                "hesap_turu": hesap_turu,
+                                "sirket_unvani": sirket_unvani,
+                                "vergi_no": vergi_no,
+                                "vergi_dairesi": vergi_dairesi,
+                                "sektor": sektor,
+                                "paket_turu": p_isim, 
+                                "abonelik_durumu": "aktif", 
+                                "abonelik_bitis": bitis_tarihi, 
+                                "kalan_hak": hak,
+                                "toplam_hak": hak,
+                                "kategoriler": ["Genel"],
+                                "kayit_tarihi": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                            users_col.insert_one(new_user_data)
+                            res_st.success("🎉 Kayıt başarıyla tamamlandı! 'Giriş Yap' sekmesinden sisteme girebilirsiniz.")
+                    except Exception as reg_err:
+                        res_st.error(f"❌ Veritabanı kayıt hatası: {reg_err}")
                 else:
                     res_st.warning("⚠️ Lütfen zorunlu alanları (*) doldurunuz.")
                     
         elif auth_mode == "Giriş Yap":
-            email = res_st.text_input("E-posta Adresi").strip().lower()
-            password = res_st.text_input("Şifre", type="password")
+            email = res_st.text_input("E-posta Adresi", key="login_email").strip().lower()
+            password = res_st.text_input("Şifre", type="password", key="login_pass")
             
             if res_st.button("Sisteme Giriş Yap", type="primary"):
-                user_record = users_col.find_one({"email": email})
-                if user_record and check_hashes(password, user_record["password"]):
-                    res_st.session_state.logged_in = True
-                    res_st.session_state.user_email = email
-                    res_st.rerun()
+                if not email or not password:
+                    res_st.warning("⚠️ E-posta ve şifre boş bırakılamaz.")
                 else:
-                    res_st.error("❌ Hatalı e-posta veya şifre!")
+                    try:
+                        user_record = users_col.find_one({"email": email})
+                        if not user_record:
+                            res_st.error(f"❌ '{email}' e-postasına ait bir kayıt bulunamadı! Lütfen önce Kayıt Olun.")
+                        elif not check_hashes(password, user_record["password"]):
+                            res_st.error("❌ Şifre hatalı! Lütfen tekrar kontrol edin.")
+                        else:
+                            res_st.session_state.logged_in = True
+                            res_st.session_state.user_email = email
+                            res_st.rerun()
+                    except Exception as log_err:
+                        res_st.error(f"❌ Veritabanı bağlantı hatası: {log_err}")
                     
     with col_auth_right:
         res_st.markdown("""
@@ -225,17 +237,17 @@ else:
     
     with res_st.sidebar:
         res_st.subheader("👤 Profil Bilgileri")
-        res_st.write(f"**Kullanıcı:** {u_info.get('ad_soyad', res_st.session_state.user_email)}")
-        if u_info.get('sirket_unvani'):
+        res_st.write(f"**Kullanıcı:** {u_info.get('ad_soyad', res_st.session_state.user_email) if u_info else res_st.session_state.user_email}")
+        if u_info and u_info.get('sirket_unvani'):
             res_st.write(f"🏢 **Şirket:** {u_info.get('sirket_unvani')}")
-        res_st.write(f"**Abonelik:** `{u_info['paket_turu']}`")
-        
-        if u_info['paket_turu'] == "Sınırsız (Kurumsal)":
-            res_st.write("**Kalan Hak:** Sınırsız ♾️")
-        else:
-            kullanilan = u_info['toplam_hak'] - u_info['kalan_hak']
-            res_st.write(f"📊 **Kota Kullanımı:** {kullanilan} / {u_info['toplam_hak']} CV")
-            res_st.progress(kullanilan / u_info['toplam_hak'])
+        if u_info:
+            res_st.write(f"**Abonelik:** `{u_info['paket_turu']}`")
+            if u_info['paket_turu'] == "Sınırsız (Kurumsal)":
+                res_st.write("**Kalan Hak:** Sınırsız ♾️")
+            else:
+                kullanilan = u_info['toplam_hak'] - u_info['kalan_hak']
+                res_st.write(f"📊 **Kota Kullanımı:** {kullanilan} / {u_info['toplam_hak']} CV")
+                res_st.progress(kullanilan / u_info['toplam_hak'])
         
         res_st.write("---")
         sayfa = res_st.radio("Gitmek İstediğiniz Sayfa:", ["🏠 Ana Sayfa (CV Analiz)", "📁 CVler (Yönetim & Kategori)"])
@@ -256,7 +268,7 @@ else:
             if uploaded_file is not None:
                 res_st.success(f"🔄 {uploaded_file.name} analize hazır.")
                 if res_st.button("🚀 Yapay Zeka İle Analiz Et", type="primary"):
-                    if u_info["paket_turu"] == "Sınırsız (Kurumsal)" or u_info["kalan_hak"] > 0:
+                    if u_info and (u_info["paket_turu"] == "Sınırsız (Kurumsal)" or u_info["kalan_hak"] > 0):
                         with res_st.spinner("🤖 Google Gemini CV'yi analiz ediyor..."):
                             cv_text = extract_text_from_pdf(uploaded_file)
                             res_st.session_state.current_analysis = analyze_cv_real(cv_text)
@@ -268,7 +280,8 @@ else:
                 res_st.write("---")
                 res_st.subheader("📥 Havuza Kaydetme Paneli")
                 
-                ana_secilen_kat = res_st.selectbox("Hangi Kategoriye Kaydedilsin?", u_info["kategoriler"], key="ana_kat_sec")
+                kategori_listesi = u_info["kategoriler"] if u_info else ["Genel"]
+                ana_secilen_kat = res_st.selectbox("Hangi Kategoriye Kaydedilsin?", kategori_listesi, key="ana_kat_sec")
                 ana_secilen_durum = res_st.radio("🚥 Aday Değerlendirme Durumu Seçin:", ["🔵 Yeni", "🟢 Olumlu", "🟡 Nötr", "🔴 Olumsuz"], horizontal=True)
                 durum_clean = ana_secilen_durum.split(" ")[1] 
                 
@@ -281,7 +294,7 @@ else:
                     
                     cvs_col.insert_one(final_cv)
                     
-                    if u_info['paket_turu'] != "Sınırsız (Kurumsal)":
+                    if u_info and u_info['paket_turu'] != "Sınırsız (Kurumsal)":
                         users_col.update_one({"email": res_st.session_state.user_email}, {"$inc": {"kalan_hak": -1}})
                     
                     res_st.success(f"💾 {final_cv.get('Ad Soyad', 'Aday')} kaydedildi!")
@@ -313,13 +326,14 @@ else:
     elif sayfa == "📁 CVler (Yönetim & Kategori)":
         res_st.subheader("📁 Özelleştirilmiş Bulut CV Deposu")
         
+        kategori_listesi = u_info["kategoriler"] if u_info else ["Genel"]
         col_kat1, col_kat2 = res_st.columns([2, 1])
         with col_kat1:
             yeni_kategori = res_st.text_input("➕ Yeni Kategori İsmi Girin").strip()
         with col_kat2:
             res_st.write("##")
             if res_st.button("Kategori Oluştur"):
-                if yeni_kategori and yeni_kategori not in u_info["kategoriler"]:
+                if yeni_kategori and yeni_kategori not in kategori_listesi:
                     users_col.update_one({"email": res_st.session_state.user_email}, {"$push": {"kategoriler": yeni_kategori}})
                     res_st.success(f"📂 '{yeni_kategori}' kategorisi oluşturuldu!")
                     res_st.rerun()
@@ -328,7 +342,7 @@ else:
         
         col_f1, col_f2 = res_st.columns(2)
         with col_f1:
-            filtre_kategori = res_st.selectbox("📂 Kategori Filtresi:", ["Hepsi"] + u_info["kategoriler"])
+            filtre_kategori = res_st.selectbox("📂 Kategori Filtresi:", ["Hepsi"] + kategori_listesi)
         with col_f2:
             filtre_durum = res_st.selectbox("🎨 Durum Filtresi:", ["Hepsi", "Yeni", "Olumlu", "Nötr", "Olumsuz"])
         
@@ -392,7 +406,7 @@ else:
                             res_st.rerun()
 
                     res_st.write("---")
-                    yeni_kat_atama = res_st.selectbox("Kategori Değiştir:", u_info["kategoriler"], index=u_info["kategoriler"].index(kayit.get("kategori")), key=f"change_kat_{kayit['_id']}")
+                    yeni_kat_atama = res_st.selectbox("Kategori Değiştir:", kategori_listesi, index=kategori_listesi.index(kayit.get("kategori")) if kayit.get("kategori") in kategori_listesi else 0, key=f"change_kat_{kayit['_id']}")
                     if yeni_kat_atama != kayit.get("kategori"):
                         cvs_col.update_one({"_id": kayit["_id"]}, {"$set": {"kategori": yeni_kat_atama}})
                         res_st.rerun()
