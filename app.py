@@ -3,6 +3,7 @@ import datetime
 import time
 import hashlib
 import json
+import base64
 from pymongo import MongoClient
 import google.generativeai as genai
 from pypdf import PdfReader
@@ -62,7 +63,6 @@ def extract_text_from_pdf(uploaded_file):
     return text
 
 def analyze_cv_real(file_text):
-    # Model ismi güncellendi ve yedekli hale getirildi
     try:
         model = genai.GenerativeModel('gemini-2.5-flash')
     except:
@@ -127,6 +127,10 @@ if 'user_email' not in res_st.session_state:
     res_st.session_state.user_email = ""
 if 'current_analysis' not in res_st.session_state:
     res_st.session_state.current_analysis = None
+if 'current_pdf_bytes' not in res_st.session_state:
+    res_st.session_state.current_pdf_bytes = None
+if 'current_pdf_name' not in res_st.session_state:
+    res_st.session_state.current_pdf_name = None
 
 # ----------------------------------------
 # 🚪 GELİŞMİŞ B2B GİRİŞ YAP / KAYIT OL EKRANI
@@ -267,6 +271,8 @@ else:
             res_st.session_state.logged_in = False
             res_st.session_state.user_email = ""
             res_st.session_state.current_analysis = None
+            res_st.session_state.current_pdf_bytes = None
+            res_st.session_state.current_pdf_name = None
             res_st.rerun()
 
     if sayfa == "🏠 Ana Sayfa (CV Analiz)":
@@ -281,8 +287,12 @@ else:
                 if res_st.button("🚀 Yapay Zeka İle Analiz Et", type="primary"):
                     if u_info and (u_info["paket_turu"] == "Sınırsız (Kurumsal)" or u_info["kalan_hak"] > 0):
                         with res_st.spinner("🤖 Google Gemini CV'yi analiz ediyor..."):
+                            pdf_bytes = uploaded_file.getvalue()
                             cv_text = extract_text_from_pdf(uploaded_file)
+                            
                             res_st.session_state.current_analysis = analyze_cv_real(cv_text)
+                            res_st.session_state.current_pdf_bytes = pdf_bytes
+                            res_st.session_state.current_pdf_name = uploaded_file.name
                             res_st.rerun()
                     else:
                         res_st.error("❌ Limitiniz bitti!")
@@ -303,13 +313,20 @@ else:
                     final_cv["durum"] = durum_clean
                     final_cv["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
+                    # PDF Dosyasını da Saklayabilmek için Base64 Kodlama
+                    if res_st.session_state.current_pdf_bytes:
+                        final_cv["pdf_base64"] = base64.b64encode(res_st.session_state.current_pdf_bytes).decode('utf-8')
+                        final_cv["pdf_filename"] = res_st.session_state.current_pdf_name
+
                     cvs_col.insert_one(final_cv)
                     
                     if u_info and u_info['paket_turu'] != "Sınırsız (Kurumsal)":
                         users_col.update_one({"email": res_st.session_state.user_email}, {"$inc": {"kalan_hak": -1}})
                     
-                    res_st.success(f"💾 {final_cv.get('Ad Soyad', 'Aday')} kaydedildi!")
+                    res_st.success(f"💾 {final_cv.get('Ad Soyad', 'Aday')} ve Orijinal CV PDF'i veritabanına kaydedildi!")
                     res_st.session_state.current_analysis = None
+                    res_st.session_state.current_pdf_bytes = None
+                    res_st.session_state.current_pdf_name = None
                     time.sleep(1)
                     res_st.rerun()
 
@@ -404,6 +421,20 @@ else:
                 
                 with res_st.expander(baslik):
                     res_st.markdown(f'<div class="category-box">📂 Kategori: {kayit.get("kategori")}</div>', unsafe_allow_html=True)
+                    
+                    # Orijinal PDF İndirme Butonu (Veritabanında PDF Varsa)
+                    if "pdf_base64" in kayit:
+                        pdf_data = base64.b64decode(kayit["pdf_base64"])
+                        dosya_adi = kayit.get("pdf_filename", f"{kayit.get('Ad Soyad')}_CV.pdf")
+                        res_st.download_button(
+                            label=f"📥 Orijinal CV PDF'ini İndir ({dosya_adi})",
+                            data=pdf_data,
+                            file_name=dosya_adi,
+                            mime="application/pdf",
+                            key=f"dl_pdf_{kayit['_id']}"
+                        )
+                        res_st.write("---")
+
                     res_st.write(f"**📞 Telefon:** {kayit.get('Telefon')}")
                     res_st.write(f"**📧 E-posta:** {kayit.get('E-posta')}")
                     res_st.write(f"**📍 Adres:** {kayit.get('Adres')}")
