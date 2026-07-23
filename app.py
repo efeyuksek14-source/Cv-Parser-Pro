@@ -171,7 +171,7 @@ if not res_st.session_state.logged_in:
                     res_st.error("Hatalı e-posta veya şifre!")
                     
     with col_auth_right:
-        res_st.image("[https://img.icons8.com/clouds/300/000000/resume.png](https://img.icons8.com/clouds/300/000000/resume.png)")
+       res_st.image("https://img.icons8.com/clouds/300/000000/resume.png")
         res_st.markdown("""
             ### Neden ParserFlow?
             * **Gerçek Yapay Zeka:** Google Gemini altyapısı ile CV'leri saniyeler içinde analiz edin.
