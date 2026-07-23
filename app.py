@@ -7,7 +7,7 @@ from pymongo import MongoClient
 import google.generativeai as genai
 from pypdf import PdfReader
 
-# 1. Arayüz Tasarımı ve Sayfa Ayarları
+# Sayfa Ayarları
 res_st.set_page_config(page_title="ParserFlow - Akıllı ATS", page_icon="🚀", layout="wide")
 
 res_st.markdown("""
@@ -22,9 +22,7 @@ res_st.markdown("""
 
 res_st.title("🚀 ParserFlow - Yapay Zeka Destekli Gelişmiş CV Yönetim Merkezi")
 
-# ----------------------------------------
-# 🗄️ MONGODB VE GEMINI API BAĞLANTILARI
-# ----------------------------------------
+# MongoDB Bağlantısı
 @res_st.cache_resource
 def init_connection():
     return MongoClient(res_st.secrets["mongo_uri"])
@@ -35,23 +33,21 @@ try:
     users_col = db["users"]
     cvs_col = db["cvs"]
 except Exception as e:
-    res_st.error("⚠️ Veritabanı bağlantısı kurulamadı. Lütfen Secrets ayarlarındaki mongo_uri alanını kontrol edin.")
+    res_st.error("⚠️ Veritabanı bağlantısı kurulamadı. Secrets ayarlarını kontrol edin.")
     res_st.stop()
 
 # Gemini API Yapılandırması
 try:
     genai.configure(api_key=res_st.secrets["GEMINI_API_KEY"])
 except Exception as e:
-    res_st.error("⚠️ Gemini API Key bulunamadı. Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+    res_st.error("⚠️ Gemini API Key bulunamadı.")
 
-# --- GÜVENLİK İÇİN ŞİFRE HASHLEME FONKSİYONLARI ---
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def check_hashes(password, hashed_text):
     return make_hashes(password) == hashed_text
 
-# --- PDF METİN OKUMA VE GEMINI ANALİZ MOTORU ---
 def extract_text_from_pdf(uploaded_file):
     reader = PdfReader(uploaded_file)
     text = ""
@@ -63,7 +59,6 @@ def extract_text_from_pdf(uploaded_file):
 
 def analyze_cv_real(file_text):
     model = genai.GenerativeModel('gemini-1.5-flash')
-    
     prompt = f"""
     Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
     Sadece geçerli bir JSON objesi döndür, başka hiçbir açıklama veya markdown bloğu (```json gibi) ekleme.
@@ -81,10 +76,8 @@ def analyze_cv_real(file_text):
     CV Metni:
     {file_text}
     """
-    
     response = model.generate_content(prompt)
     raw_response = response.text.strip().replace("```json", "").replace("```", "")
-    
     try:
         data = json.loads(raw_response)
     except:
@@ -100,15 +93,14 @@ def analyze_cv_real(file_text):
 
 def generate_email_template(aday_isim, durum):
     if durum == "Olumlu":
-        return f"Konu: İş Başvurusu Sonucu - Mülakat Daveti\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz özgeçmiş başvurusu ekiplerimiz tarafından detaylıca incelenmiş ve tecrübeleriniz pozisyonumuz için oldukça olumlu bulunmuştur.\n\nSizinle daha yakından tanışmak ve pozisyon detaylarını görüşmek üzere en kısa sürede bir online mülakat planlamak istiyoruz. Uygun olduğunuz gün ve saat aralıklarını bu e-postayı yanıtlayarak bizimle paylaşabilir misiniz?\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+        return f"Konu: İş Başvurusu Sonucu - Mülakat Daveti\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz özgeçmiş başvurusu ekiplerimiz tarafından detaylıca incelenmiş ve tecrübeleriniz pozisyonumuz için oldukça olumlu bulunmuştur.\n\nSizinle daha yakından tanışmak ve pozisyon detaylarını görüşmek üzere en kısa sürede bir online mülakat planlamak istiyoruz.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
     elif durum == "Olumsuz":
-        return f"Konu: İş Başvurusu Sonucu Bilgilendirmesi\n\nSayın {aday_isim},\n\nŞirketimize göstermiş olduğunuz ilgi ve yapmış olduğunuz iş başvurusu için çok teşekkür ederiz.\n\nÖzgeçmişiniz detaylıca incelenmiş ancak aranan spesifik kriterler doğrultusunda şu aşamada sürecimize farklı bir aday ile devam etme kararı alınmıştır.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+        return f"Konu: İş Başvurusu Sonucu Bilgilendirmesi\n\nSayın {aday_isim},\n\nŞirketimize göstermiş olduğunuz ilgi için teşekkür ederiz. Başvurunuz incelenmiş ancak farklı bir aday ile devam etme kararı alınmıştır.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
     elif durum == "Nötr":
-        return f"Konu: İş Başvurusu Durumu - Değerlendirme Süreci\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz iş başvurusu İnsan Kaynakları havuzumuza başarıyla kaydedilmiştir. Değerlendirmelerimiz devam etmekte olup, sürecin tamamlanmasının ardından tarafınıza geri dönüş sağlanacaktır.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+        return f"Konu: İş Başvurusu Durumu - Değerlendirme Süreci\n\nSayın {aday_isim},\n\nŞirketimize yapmış olduğunuz iş başvurusu havuzumuza başarıyla kaydedilmiştir. Değerlendirmelerimiz devam etmektedir.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
     else:
-        return f"Konu: Başvurunuz Hakkında\n\nSayın {aday_isim},\n\nİş başvurunuz sistemimize ulaştı. Güncel durumunuz 'Yeni' olarak işaretlenmiştir.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
+        return f"Konu: Başvurunuz Hakkında\n\nSayın {aday_isim},\n\nİş başvurunuz sistemimize ulaştı.\n\nSaygılarımızla,\nİnsan Kaynakları Departmanı"
 
-# --- GEÇİCİ DURUM HAFIZALARI ---
 if 'logged_in' not in res_st.session_state:
     res_st.session_state.logged_in = False
 if 'user_email' not in res_st.session_state:
@@ -116,9 +108,7 @@ if 'user_email' not in res_st.session_state:
 if 'current_analysis' not in res_st.session_state:
     res_st.session_state.current_analysis = None
 
-# ----------------------------------------
-# 🚪 GİRİŞ YAP / KAYIT OL EKRANI
-# ----------------------------------------
+# GİRİŞ / KAYIT EKRANI
 if not res_st.session_state.logged_in:
     col_auth_left, col_auth_right = res_st.columns([1, 1.2])
     
@@ -156,7 +146,7 @@ if not res_st.session_state.logged_in:
                             "kategoriler": ["Genel"]
                         }
                         users_col.insert_one(new_user_data)
-                        res_st.success("🎉 Kayıt başarılı! MongoDB veritabanına eklendiniz. 'Giriş Yap' sekmesinden hesabınıza girebilirsiniz.")
+                        res_st.success("🎉 Kayıt başarılı! MongoDB veritabanına eklendiniz. 'Giriş Yap' sekmesinden giriş yapabilirsiniz.")
                 else:
                     res_st.warning("Lütfen boş alanları doldurun.")
                     
@@ -171,16 +161,13 @@ if not res_st.session_state.logged_in:
                     res_st.error("Hatalı e-posta veya şifre!")
                     
     with col_auth_right:
-       res_st.image("https://img.icons8.com/clouds/300/000000/resume.png")
         res_st.markdown("""
             ### Neden ParserFlow?
             * **Gerçek Yapay Zeka:** Google Gemini altyapısı ile CV'leri saniyeler içinde analiz edin.
             * **Kalıcı Bulut Depolama:** MongoDB entegrasyonu sayesinde verileriniz her cihazdan erişilebilir.
         """)
 
-# ----------------------------------------
-# 🖥️ ANA SİSTEM (GİRİŞ YAPILDIYSA)
-# ----------------------------------------
+# ANA SİSTEM
 else:
     u_info = users_col.find_one({"email": res_st.session_state.user_email})
     
@@ -195,11 +182,8 @@ else:
             kullanilan = u_info['toplam_hak'] - u_info['kalan_hak']
             res_st.write(f"📊 **Kota Kullanımı:** {kullanilan} / {u_info['toplam_hak']} CV")
             res_st.progress(kullanilan / u_info['toplam_hak'])
-            if u_info['kalan_hak'] <= 5:
-                res_st.error("⚠️ Kotanız bitmek üzere!")
         
         res_st.write("---")
-        res_st.subheader("🗺️ Navigasyon")
         sayfa = res_st.radio("Gitmek İstediğiniz Sayfa:", ["🏠 Ana Sayfa (CV Analiz)", "📁 CVler (Yönetim & Kategori)"])
         res_st.write("---")
         if res_st.button("🚪 Güvenli Çıkış"):
@@ -208,7 +192,6 @@ else:
             res_st.session_state.current_analysis = None
             res_st.rerun()
 
-    # 🏠 SAYFA 1: ANA SAYFA (GERÇEK GEMINI CV ANALİZ)
     if sayfa == "🏠 Ana Sayfa (CV Analiz)":
         col_left, col_right = res_st.columns([1, 1.5])
 
@@ -218,25 +201,21 @@ else:
             
             if uploaded_file is not None:
                 res_st.success(f"🔄 {uploaded_file.name} analize hazır.")
-                if res_st.button("🚀 Gerçek Yapay Zeka İle Analiz Et", type="primary"):
+                if res_st.button("🚀 Yapay Zeka İle Analiz Et", type="primary"):
                     if u_info["paket_turu"] == "Sınırsız (Kurumsal)" or u_info["kalan_hak"] > 0:
-                        with res_st.spinner("🤖 Google Gemini CV'yi okuyor ve analiz ediyor..."):
+                        with res_st.spinner("🤖 Google Gemini CV'yi analiz ediyor..."):
                             cv_text = extract_text_from_pdf(uploaded_file)
                             res_st.session_state.current_analysis = analyze_cv_real(cv_text)
                             res_st.rerun()
                     else:
-                        res_st.error("❌ Limitiniz bitti! Lütfen paketinizi yükseltin.")
+                        res_st.error("❌ Limitiniz bitti!")
 
             if res_st.session_state.current_analysis is not None:
                 res_st.write("---")
                 res_st.subheader("📥 Havuza Kaydetme Paneli")
                 
                 ana_secilen_kat = res_st.selectbox("Hangi Kategoriye Kaydedilsin?", u_info["kategoriler"], key="ana_kat_sec")
-                ana_secilen_durum = res_st.radio(
-                    "🚥 Aday Değerlendirme Durumu Seçin:",
-                    ["🔵 Yeni", "🟢 Olumlu", "🟡 Nötr", "🔴 Olumsuz"],
-                    horizontal=True
-                )
+                ana_secilen_durum = res_st.radio("🚥 Aday Değerlendirme Durumu Seçin:", ["🔵 Yeni", "🟢 Olumlu", "🟡 Nötr", "🔴 Olumsuz"], horizontal=True)
                 durum_clean = ana_secilen_durum.split(" ")[1] 
                 
                 if res_st.button("💾 Havuza Güvenle Kaydet", type="secondary"):
@@ -246,14 +225,12 @@ else:
                     final_cv["durum"] = durum_clean
                     final_cv["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # 📝 MongoDB CV koleksiyonuna kayıt
                     cvs_col.insert_one(final_cv)
                     
-                    # 📉 Kullanıcı kotasını güncelleme
                     if u_info['paket_turu'] != "Sınırsız (Kurumsal)":
                         users_col.update_one({"email": res_st.session_state.user_email}, {"$inc": {"kalan_hak": -1}})
                     
-                    res_st.success(f"💾 {final_cv.get('Ad Soyad', 'Aday')} bulut veritabanına başarıyla kaydedildi!")
+                    res_st.success(f"💾 {final_cv.get('Ad Soyad', 'Aday')} kaydedildi!")
                     res_st.session_state.current_analysis = None
                     time.sleep(1)
                     res_st.rerun()
@@ -263,7 +240,7 @@ else:
             if res_st.session_state.current_analysis is not None:
                 res = res_st.session_state.current_analysis
                 res_st.markdown('<div class="result-card">', unsafe_allow_html=True)
-                res_st.markdown(f"### 👤 Gemini Tarafından Ayıklanan Bilgiler")
+                res_st.markdown("### 👤 Ayıklanan Bilgiler")
                 res_st.write(f"**Adı Soyadı:** {res.get('Ad Soyad')}")
                 res_st.write(f"**📞 Telefon:** {res.get('Telefon')}")
                 res_st.write(f"**📧 E-posta:** {res.get('E-posta')}")
@@ -279,7 +256,6 @@ else:
             else:
                 res_st.info("Yapay zeka analiz sonuçları burada görünecek.")
 
-    # 📁 SAYFA 2: CV'LER (KATEGORİ, RENKLİ DAİRE VE ANLIK MEKTUP ÜRETİMİ)
     elif sayfa == "📁 CVler (Yönetim & Kategori)":
         res_st.subheader("📁 Özelleştirilmiş Bulut CV Deposu")
         
@@ -310,13 +286,12 @@ else:
             
         kullanici_kayitlari = list(cvs_col.find(query).sort("kayit_tarihi", -1))
         
-        res_st.write(f"### 📄 Aday Havuzu ({len(kullanici_kayitlari)} Aday Bulutta Saklanıyor)")
+        res_st.write(f"### 📄 Aday Havuzu ({len(kullanici_kayitlari)} Aday)")
         
         if len(kullanici_kayitlari) > 0:
             for kayit in kullanici_kayitlari:
                 emoji_map = {"Yeni": "🔵", "Olumlu": "🟢", "Nötr": "🟡", "Olumsuz": "🔴"}
                 current_emoji = emoji_map.get(kayit.get("durum", "Yeni"), "🔵")
-                
                 baslik = f"📄 {kayit.get('Ad Soyad')} | Durum: {kayit.get('durum')} | Tarih: {kayit.get('kayit_tarihi')} {current_emoji}"
                 
                 with res_st.expander(baslik):
@@ -348,8 +323,6 @@ else:
                             res_st.rerun()
 
                     res_st.write("---")
-                    res_st.write("**✉️ Aday İletişim Yönetimi:**")
-                    
                     state_key = f"email_generated_{kayit['_id']}"
                     if state_key not in res_st.session_state:
                         res_st.session_state[state_key] = False
@@ -360,15 +333,12 @@ else:
                     if res_st.session_state[state_key]:
                         sablon_metin = generate_email_template(kayit.get('Ad Soyad'), kayit.get('durum'))
                         res_st.markdown(f'<div class="email-box">{sablon_metin}</div>', unsafe_allow_html=True)
-                        
                         if res_st.button("❌ Taslağı Kapat", key=f"close_email_{kayit['_id']}"):
                             res_st.session_state[state_key] = False
                             res_st.rerun()
 
                     res_st.write("---")
-                    yeni_kat_atama = res_st.selectbox(
-                        "Kategori Değiştir:", u_info["kategoriler"], index=u_info["kategoriler"].index(kayit.get("kategori")), key=f"change_kat_{kayit['_id']}"
-                    )
+                    yeni_kat_atama = res_st.selectbox("Kategori Değiştir:", u_info["kategoriler"], index=u_info["kategoriler"].index(kayit.get("kategori")), key=f"change_kat_{kayit['_id']}")
                     if yeni_kat_atama != kayit.get("kategori"):
                         cvs_col.update_one({"_id": kayit["_id"]}, {"$set": {"kategori": yeni_kat_atama}})
                         res_st.rerun()
