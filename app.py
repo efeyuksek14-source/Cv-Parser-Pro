@@ -26,9 +26,15 @@ res_st.title("🚀 ParserFlow - Yapay Zeka Destekli Gelişmiş CV Yönetim Merke
 # ----------------------------------------
 # 🗄️ MONGODB VE GEMINI API BAĞLANTILARI
 # ----------------------------------------
-@res_st.cache_resource
+# ttl=3600 sayesinde bağlantı her saat başı otomatik yenilenir, "bad auth" ve kopma hatasını engeller
+@res_st.cache_resource(ttl=3600)
 def init_connection():
-    return MongoClient(res_st.secrets["mongo_uri"])
+    return MongoClient(
+        res_st.secrets["mongo_uri"],
+        connectTimeoutMS=30000,
+        socketTimeoutMS=None,
+        connect=False
+    )
 
 try:
     client = init_connection()
@@ -313,7 +319,7 @@ else:
                     final_cv["durum"] = durum_clean
                     final_cv["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # PDF Dosyasını da Saklayabilmek için Base64 Kodlama
+                    # Orijinal PDF'i saklamak için Base64 formatı
                     if res_st.session_state.current_pdf_bytes:
                         final_cv["pdf_base64"] = base64.b64encode(res_st.session_state.current_pdf_bytes).decode('utf-8')
                         final_cv["pdf_filename"] = res_st.session_state.current_pdf_name
@@ -323,7 +329,7 @@ else:
                     if u_info and u_info['paket_turu'] != "Sınırsız (Kurumsal)":
                         users_col.update_one({"email": res_st.session_state.user_email}, {"$inc": {"kalan_hak": -1}})
                     
-                    res_st.success(f"💾 {final_cv.get('Ad Soyad', 'Aday')} ve Orijinal CV PDF'i veritabanına kaydedildi!")
+                    res_st.success(f"💾 {final_cv.get('Ad Soyad', 'Aday')} veritabanına kaydedildi!")
                     res_st.session_state.current_analysis = None
                     res_st.session_state.current_pdf_bytes = None
                     res_st.session_state.current_pdf_name = None
@@ -422,7 +428,6 @@ else:
                 with res_st.expander(baslik):
                     res_st.markdown(f'<div class="category-box">📂 Kategori: {kayit.get("kategori")}</div>', unsafe_allow_html=True)
                     
-                    # Orijinal PDF İndirme Butonu (Veritabanında PDF Varsa)
                     if "pdf_base64" in kayit:
                         pdf_data = base64.b64decode(kayit["pdf_base64"])
                         dosya_adi = kayit.get("pdf_filename", f"{kayit.get('Ad Soyad')}_CV.pdf")
