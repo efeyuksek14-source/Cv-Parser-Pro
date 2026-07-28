@@ -1,4 +1,4 @@
-Python
+
 import streamlit as res_st
 import datetime
 import time
