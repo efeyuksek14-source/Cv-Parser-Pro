@@ -40,10 +40,14 @@ except Exception as e:
     res_st.stop()
 
 # Gemini API Yapılandırması
+api_key_status = True
 try:
-    genai.configure(api_key=res_st.secrets["GEMINI_API_KEY"])
+    if "GEMINI_API_KEY" in res_st.secrets and res_st.secrets["GEMINI_API_KEY"].strip():
+        genai.configure(api_key=res_st.secrets["GEMINI_API_KEY"].strip())
+    else:
+        api_key_status = False
 except Exception as e:
-    res_st.error(f"⚠️ Gemini API Key hatası: {e}")
+    api_key_status = False
 
 # --- GÜVENLİK İÇİN ŞİFRE HASHLEME FONKSİYONLARI ---
 def make_hashes(password):
@@ -63,10 +67,14 @@ def extract_text_from_pdf(uploaded_file):
     return text
 
 def analyze_cv_real(file_text):
-    # En stabil modeller sırasıyla deneniyor
-    model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+    if not api_key_status:
+        res_st.error("❌ Streamlit Secrets içerisinde geçerli bir GEMINI_API_KEY bulunamadı!")
+        return None
+
+    # Google API'deki aktif ve desteklenen tüm model varyasyonları
+    model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-pro']
     response = None
-    last_err = ""
+    errors = []
 
     prompt = f"""
     Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
@@ -93,27 +101,19 @@ def analyze_cv_real(file_text):
     for m_name in model_names:
         try:
             model = genai.GenerativeModel(m_name)
-            response = model.generate_content(prompt)
-            if response and hasattr(response, 'text') and response.text:
+            res = model.generate_content(prompt)
+            if res and hasattr(res, 'text') and res.text:
+                response = res
                 break
         except Exception as err:
-            last_err = str(err)
+            errors.append(f"{m_name}: {str(err)}")
             continue
 
-    if not response or not hasattr(response, 'text') or not response.text:
-        res_st.error(f"⚠️ Yapay zeka analizi sırasında bir hata oluştu: {last_err}")
-        return {
-            "Ad Soyad": "Analiz Edilemedi",
-            "Telefon": "Bulunamadı",
-            "E-posta": "Bulunamadı",
-            "Adres": "Bulunamadı",
-            "Toplam Tecrübe": "Bulunamadı",
-            "Deneyim": ["Analiz sırasında API hatası alındı."],
-            "Eğitim": ["Bulunamadı"],
-            "Diller": ["Bulunamadı"],
-            "Sertifikalar": ["Bulunamadı"],
-            "Yetenekler": "Bulunamadı"
-        }
+    if not response:
+        # Eğer hiçbiri çalışmazsa arkadaki gerçek teknik hatayı ekrana basıyoruz
+        err_msg = " | ".join(errors) if errors else "Bilinmeyen API Hatası"
+        res_st.error(f"🚨 API Bağlantı Detayı: {err_msg}")
+        return None
 
     raw_response = response.text.strip().replace("```json", "").replace("```", "")
     
@@ -314,10 +314,12 @@ else:
                             pdf_bytes = uploaded_file.getvalue()
                             cv_text = extract_text_from_pdf(uploaded_file)
                             
-                            res_st.session_state.current_analysis = analyze_cv_real(cv_text)
-                            res_st.session_state.current_pdf_bytes = pdf_bytes
-                            res_st.session_state.current_pdf_name = uploaded_file.name
-                            res_st.rerun()
+                            analysis_result = analyze_cv_real(cv_text)
+                            if analysis_result:
+                                res_st.session_state.current_analysis = analysis_result
+                                res_st.session_state.current_pdf_bytes = pdf_bytes
+                                res_st.session_state.current_pdf_name = uploaded_file.name
+                                res_st.rerun()
                     else:
                         res_st.error("❌ Limitiniz bitti!")
 
