@@ -1,3 +1,4 @@
+Python
 import streamlit as res_st
 import datetime
 import time
@@ -26,15 +27,10 @@ res_st.title("🚀 ParserFlow - Yapay Zeka Destekli Gelişmiş CV Yönetim Merke
 # ----------------------------------------
 # 🗄️ MONGODB VE GEMINI API BAĞLANTILARI
 # ----------------------------------------
-# ttl=3600 sayesinde bağlantı her saat başı otomatik yenilenir, "bad auth" ve kopma hatasını engeller
-@res_st.cache_resource(ttl=3600)
+@res_st.cache_resource
 def init_connection():
-    return MongoClient(
-        res_st.secrets["mongo_uri"],
-        connectTimeoutMS=30000,
-        socketTimeoutMS=None,
-        connect=False
-    )
+    # Hızlı ve stabil hafif bağlantı sürücüsü
+    return MongoClient(res_st.secrets["mongo_uri"], serverSelectionTimeoutMS=5000)
 
 try:
     client = init_connection()
@@ -69,10 +65,8 @@ def extract_text_from_pdf(uploaded_file):
     return text
 
 def analyze_cv_real(file_text):
-    try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
-    except:
-        model = genai.GenerativeModel('gemini-2.0-flash')
+    # En hızlı yanıt veren kararlı model
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
     Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
@@ -319,7 +313,6 @@ else:
                     final_cv["durum"] = durum_clean
                     final_cv["kayit_tarihi"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # Orijinal PDF'i saklamak için Base64 formatı
                     if res_st.session_state.current_pdf_bytes:
                         final_cv["pdf_base64"] = base64.b64encode(res_st.session_state.current_pdf_bytes).decode('utf-8')
                         final_cv["pdf_filename"] = res_st.session_state.current_pdf_name
