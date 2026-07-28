@@ -1,4 +1,3 @@
-
 import streamlit as res_st
 import datetime
 import time
@@ -29,7 +28,6 @@ res_st.title("🚀 ParserFlow - Yapay Zeka Destekli Gelişmiş CV Yönetim Merke
 # ----------------------------------------
 @res_st.cache_resource
 def init_connection():
-    # Hızlı ve stabil hafif bağlantı sürücüsü
     return MongoClient(res_st.secrets["mongo_uri"], serverSelectionTimeoutMS=5000)
 
 try:
@@ -65,32 +63,44 @@ def extract_text_from_pdf(uploaded_file):
     return text
 
 def analyze_cv_real(file_text):
-    # En hızlı yanıt veren kararlı model
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    prompt = f"""
-    Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
-    Sadece geçerli bir JSON objesi döndür, başka hiçbir açıklama veya markdown bloğu (```json gibi) ekleme.
+    # Model ismi güncellendi: Bulunamadı (NotFound) hatasını önlemek için dinamik dene/geç yapısı kuruldu.
+    model_names = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro']
+    response = None
 
-    İstenen JSON Formatı:
-    {{
-        "Ad Soyad": "Adayın Adı Soyadı",
-        "Telefon": "Telefon numarası veya Bulunamadı",
-        "E-posta": "E-posta adresi veya Bulunamadı",
-        "Adres": "Şehir/Adres bilgisi veya Bulunamadı",
-        "Toplam Tecrübe": "Tahmini veya belirtilen toplam tecrübe süresi (Örn: 3 Yıl)",
-        "Deneyim": ["Son iş tecrübeleri (En fazla 5 iş tecrübesi listele: Şirket - Pozisyon - Tarih Aralığı)"],
-        "Eğitim": ["Okul/Üniversite - Bölüm - Mezuniyet Yılı"],
-        "Diller": ["Bilinen yabancı diller ve seviyeleri"],
-        "Sertifikalar": ["Sahip olunan sertifikalar, kurslar ve belgeler"],
-        "Yetenekler": "Öne çıkan teknik yetenekler, yazılımlar ve beceriler"
-    }}
+    for m_name in model_names:
+        try:
+            model = genai.GenerativeModel(m_name)
+            
+            prompt = f"""
+            Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
+            Sadece geçerli bir JSON objesi döndür, başka hiçbir açıklama veya markdown bloğu (```json gibi) ekleme.
 
-    CV Metni:
-    {file_text}
-    """
-    
-    response = model.generate_content(prompt)
+            İstenen JSON Formatı:
+            {{
+                "Ad Soyad": "Adayın Adı Soyadı",
+                "Telefon": "Telefon numarası veya Bulunamadı",
+                "E-posta": "E-posta adresi veya Bulunamadı",
+                "Adres": "Şehir/Adres bilgisi veya Bulunamadı",
+                "Toplam Tecrübe": "Tahmini veya belirtilen toplam tecrübe süresi (Örn: 3 Yıl)",
+                "Deneyim": ["Son iş tecrübeleri (En fazla 5 iş tecrübesi listele: Şirket - Pozisyon - Tarih Aralığı)"],
+                "Eğitim": ["Okul/Üniversite - Bölüm - Mezuniyet Yılı"],
+                "Diller": ["Bilinen yabancı diller ve seviyeleri"],
+                "Sertifikalar": ["Sahip olunan sertifikalar, kurslar ve belgeler"],
+                "Yetenekler": "Öne çıkan teknik yetenekler, yazılımlar ve beceriler"
+            }}
+
+            CV Metni:
+            {file_text}
+            """
+            response = model.generate_content(prompt)
+            if response:
+                break
+        except Exception:
+            continue
+
+    if not response:
+        raise Exception("Google Gemini API modellerine erişilemedi. Lütfen API anahtarınızı kontrol edin.")
+
     raw_response = response.text.strip().replace("```json", "").replace("```", "")
     
     try:
