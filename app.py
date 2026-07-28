@@ -63,43 +63,57 @@ def extract_text_from_pdf(uploaded_file):
     return text
 
 def analyze_cv_real(file_text):
-    # Model ismi güncellendi: Bulunamadı (NotFound) hatasını önlemek için dinamik dene/geç yapısı kuruldu.
-    model_names = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro']
+    # En stabil modeller sırasıyla deneniyor
+    model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
     response = None
+    last_err = ""
+
+    prompt = f"""
+    Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
+    Sadece geçerli bir JSON objesi döndür, başka hiçbir açıklama veya markdown bloğu (```json gibi) ekleme.
+
+    İstenen JSON Formatı:
+    {{
+        "Ad Soyad": "Adayın Adı Soyadı",
+        "Telefon": "Telefon numarası veya Bulunamadı",
+        "E-posta": "E-posta adresi veya Bulunamadı",
+        "Adres": "Şehir/Adres bilgisi veya Bulunamadı",
+        "Toplam Tecrübe": "Tahmini veya belirtilen toplam tecrübe süresi (Örn: 3 Yıl)",
+        "Deneyim": ["Son iş tecrübeleri (En fazla 5 iş tecrübesi listele: Şirket - Pozisyon - Tarih Aralığı)"],
+        "Eğitim": ["Okul/Üniversite - Bölüm - Mezuniyet Yılı"],
+        "Diller": ["Bilinen yabancı diller ve seviyeleri"],
+        "Sertifikalar": ["Sahip olunan sertifikalar, kurslar ve belgeler"],
+        "Yetenekler": "Öne çıkan teknik yetenekler, yazılımlar ve beceriler"
+    }}
+
+    CV Metni:
+    {file_text}
+    """
 
     for m_name in model_names:
         try:
             model = genai.GenerativeModel(m_name)
-            
-            prompt = f"""
-            Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
-            Sadece geçerli bir JSON objesi döndür, başka hiçbir açıklama veya markdown bloğu (```json gibi) ekleme.
-
-            İstenen JSON Formatı:
-            {{
-                "Ad Soyad": "Adayın Adı Soyadı",
-                "Telefon": "Telefon numarası veya Bulunamadı",
-                "E-posta": "E-posta adresi veya Bulunamadı",
-                "Adres": "Şehir/Adres bilgisi veya Bulunamadı",
-                "Toplam Tecrübe": "Tahmini veya belirtilen toplam tecrübe süresi (Örn: 3 Yıl)",
-                "Deneyim": ["Son iş tecrübeleri (En fazla 5 iş tecrübesi listele: Şirket - Pozisyon - Tarih Aralığı)"],
-                "Eğitim": ["Okul/Üniversite - Bölüm - Mezuniyet Yılı"],
-                "Diller": ["Bilinen yabancı diller ve seviyeleri"],
-                "Sertifikalar": ["Sahip olunan sertifikalar, kurslar ve belgeler"],
-                "Yetenekler": "Öne çıkan teknik yetenekler, yazılımlar ve beceriler"
-            }}
-
-            CV Metni:
-            {file_text}
-            """
             response = model.generate_content(prompt)
-            if response:
+            if response and hasattr(response, 'text') and response.text:
                 break
-        except Exception:
+        except Exception as err:
+            last_err = str(err)
             continue
 
-    if not response:
-        raise Exception("Google Gemini API modellerine erişilemedi. Lütfen API anahtarınızı kontrol edin.")
+    if not response or not hasattr(response, 'text') or not response.text:
+        res_st.error(f"⚠️ Yapay zeka analizi sırasında bir hata oluştu: {last_err}")
+        return {
+            "Ad Soyad": "Analiz Edilemedi",
+            "Telefon": "Bulunamadı",
+            "E-posta": "Bulunamadı",
+            "Adres": "Bulunamadı",
+            "Toplam Tecrübe": "Bulunamadı",
+            "Deneyim": ["Analiz sırasında API hatası alındı."],
+            "Eğitim": ["Bulunamadı"],
+            "Diller": ["Bulunamadı"],
+            "Sertifikalar": ["Bulunamadı"],
+            "Yetenekler": "Bulunamadı"
+        }
 
     raw_response = response.text.strip().replace("```json", "").replace("```", "")
     
