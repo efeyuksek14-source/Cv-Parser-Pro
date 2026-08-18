@@ -77,7 +77,7 @@ def extract_text_from_pdf(uploaded_file):
 
     return text
 
-# --- HEADER TABANLI REST API İLE GEMINI CV ANALİZ MOTORU ---
+# --- REST API İLE GEMINI CV ANALİZ MOTORU ---
 def analyze_cv_real(file_text):
     api_key = str(res_st.secrets.get("GEMINI_API_KEY", "")).strip().strip("'").strip('"')
     if not api_key:
@@ -129,26 +129,21 @@ def analyze_cv_real(file_text):
     {file_text}
     """
 
-    models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp", "gemini-pro"]
+    models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-pro"]
     raw_text = None
     last_error = ""
-
-    # Güvenli URL ve Header Yapısı
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": api_key
-    }
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.1}
     }
+    headers = {"Content-Type": "application/json"}
 
     for model in models:
-        url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent".strip()
+        endpoint = "[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/)" + model + ":generateContent?key=" + api_key
 
         try:
-            res = requests.post(url, json=payload, headers=headers, timeout=30)
+            res = requests.post(endpoint, json=payload, headers=headers, timeout=30)
             if res.status_code == 200:
                 res_json = res.json()
                 raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
@@ -181,7 +176,6 @@ def analyze_cv_real(file_text):
             "Yetenekler": "Genel"
         }
 
-    # Eğer yapay zeka boş döndüyse regex ile yakalanan telefon/maili otomatik ata
     if data.get("Telefon") in ["Bulunamadı", "Belirtilmemiş", None, ""] and detected_phone != "Belirtilmemiş":
         data["Telefon"] = detected_phone
     if data.get("E-posta") in ["Bulunamadı", "Belirtilmemiş", None, ""] and detected_email != "Belirtilmemiş":
