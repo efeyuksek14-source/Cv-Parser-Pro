@@ -54,7 +54,7 @@ def extract_text_from_pdf(uploaded_file):
     pdf_bytes = uploaded_file.getvalue()
     text = ""
     
-    # 1. Öncelik: Düzen ve sütunları koruyan pdfplumber
+    # 1. Öncelik: Sütun düzenini koruyan pdfplumber
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             for page in pdf.pages:
@@ -64,7 +64,7 @@ def extract_text_from_pdf(uploaded_file):
     except Exception:
         text = ""
 
-    # 2. Yedek: Eğer pdfplumber boş dönerse standart pypdf
+    # 2. Yedek: Standart pypdf
     if not text.strip():
         try:
             reader = PdfReader(io.BytesIO(pdf_bytes))
@@ -77,14 +77,14 @@ def extract_text_from_pdf(uploaded_file):
 
     return text
 
-# --- GELİŞMİŞ CV BİLGİ ÇIKARICI ---
+# --- HEADER TABANLI REST API İLE GEMINI CV ANALİZ MOTORU ---
 def analyze_cv_real(file_text):
-    api_key = res_st.secrets.get("GEMINI_API_KEY", "").strip()
+    api_key = str(res_st.secrets.get("GEMINI_API_KEY", "")).strip().strip("'").strip('"')
     if not api_key:
         res_st.error("❌ Streamlit Secrets içerisinde GEMINI_API_KEY bulunamadı!")
         return None
 
-    # İletişim bilgilerini metinden doğrudan yakalayan Regex ön-taraması
+    # İletişim bilgilerini yakalayan Regex ön-taraması
     phone_matches = re.findall(r'(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}|\b\d{10,11}\b', file_text)
     detected_phone = phone_matches[0] if phone_matches else "Belirtilmemiş"
 
@@ -133,13 +133,19 @@ def analyze_cv_real(file_text):
     raw_text = None
     last_error = ""
 
+    # Güvenli URL ve Header Yapısı
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key
+    }
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.1}
+    }
+
     for model in models:
-        url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.1}
-        }
-        headers = {"Content-Type": "application/json"}
+        url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent".strip()
 
         try:
             res = requests.post(url, json=payload, headers=headers, timeout=30)
