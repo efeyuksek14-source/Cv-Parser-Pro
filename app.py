@@ -4,9 +4,12 @@ import time
 import hashlib
 import json
 import base64
+import re
+import requests
 from pymongo import MongoClient
-import google.generativeai as genai
+import pdfplumber
 from pypdf import PdfReader
+import io
 
 # 1. Arayüz Tasarımı ve Sayfa Ayarları
 res_st.set_page_config(page_title="ParserFlow - Akıllı ATS", page_icon="🚀", layout="wide")
@@ -24,7 +27,7 @@ res_st.markdown("""
 res_st.title("🚀 ParserFlow - Yapay Zeka Destekli Gelişmiş CV Yönetim Merkezi")
 
 # ----------------------------------------
-# 🗄️ MONGODB VE GEMINI API BAĞLANTILARI
+# 🗄️ MONGODB BAĞLANTISI
 # ----------------------------------------
 @res_st.cache_resource
 def init_connection():
@@ -39,11 +42,6 @@ except Exception as e:
     res_st.error(f"⚠️ Veritabanı bağlantısı kurulamadı: {e}")
     res_st.stop()
 
-# Gemini API Yapılandırması
-api_key_val = res_st.secrets.get("GEMINI_API_KEY", "").strip()
-if api_key_val:
-    genai.configure(api_key=api_key_val)
-
 # --- GÜVENLİK İÇİN ŞİFRE HASHLEME FONKSİYONLARI ---
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
@@ -51,93 +49,138 @@ def make_hashes(password):
 def check_hashes(password, hashed_text):
     return make_hashes(password) == hashed_text
 
-# --- PDF METİN OKUMA VE GEMINI ANALİZ MOTORU ---
+# --- GELİŞMİŞ VE SÜTUN KORUYUCU PDF METİN OKUYUCU ---
 def extract_text_from_pdf(uploaded_file):
-    reader = PdfReader(uploaded_file)
+    pdf_bytes = uploaded_file.getvalue()
     text = ""
-    for page in reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text += extracted + "\n"
+    
+    # 1. Öncelik: Düzen ve sütunları koruyan pdfplumber
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                extracted = page.extract_text(layout=True)
+                if extracted:
+                    text += extracted + "\n\n"
+    except Exception:
+        text = ""
+
+    # 2. Yedek: Eğer pdfplumber boş dönerse standart pypdf
+    if not text.strip():
+        try:
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+        except Exception:
+            pass
+
     return text
 
+# --- GELİŞMİŞ CV BİLGİ ÇIKARICI ---
 def analyze_cv_real(file_text):
-    if not api_key_val:
+    api_key = res_st.secrets.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
         res_st.error("❌ Streamlit Secrets içerisinde GEMINI_API_KEY bulunamadı!")
         return None
 
+    # İletişim bilgilerini metinden doğrudan yakalayan Regex ön-taraması
+    phone_matches = re.findall(r'(?:\+?\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}|\b\d{10,11}\b', file_text)
+    detected_phone = phone_matches[0] if phone_matches else "Belirtilmemiş"
+
+    email_matches = re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', file_text)
+    detected_email = email_matches[0] if email_matches else "Belirtilmemiş"
+
     prompt = f"""
-    Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
-    Sadece geçerli bir JSON objesi döndür, başka hiçbir açıklama veya markdown bloğu (```json gibi) ekleme.
+    Sen uzman bir İnsan Kaynakları (ATS) yapay zekasısın. Görevin aşağıdaki CV metnini çok dikkatli analiz edip aday bilgilerini eksiksiz ayıklamaktır.
+    
+    ÖNEMLİ KURALLAR:
+    1. Telefon numarası, e-posta, şehir gibi iletişim bilgileri sayfanın üstünde, altında veya yan sütunlarında olabilir. Mutlaka ara ve bul.
+    2. Telefon veya e-posta için ipucu (Regex ön-tarama sonucu):
+       - Olası Telefon: {detected_phone}
+       - Olası E-posta: {detected_email}
+    3. İş tecrübelerini kronolojik olarak en son çalıştığı yerden geriye doğru sırala (En fazla 5 iş).
+    4. Üniversite/Lise, bölüm ve mezuniyet yılı bilgilerini 'Eğitim' listesine ekle.
+    5. Cevabı SADECE ve SADECE JSON formatında ver. Markdown (```json) veya ekstra yorum ekleme.
 
     İstenen JSON Formatı:
     {{
-        "Ad Soyad": "Adayın Adı Soyadı",
-        "Telefon": "Telefon numarası veya Bulunamadı",
-        "E-posta": "E-posta adresi veya Bulunamadı",
-        "Adres": "Şehir/Adres bilgisi veya Bulunamadı",
-        "Toplam Tecrübe": "Tahmini veya belirtilen toplam tecrübe süresi (Örn: 3 Yıl)",
-        "Deneyim": ["Son iş tecrübeleri (En fazla 5 iş tecrübesi listele: Şirket - Pozisyon - Tarih Aralığı)"],
-        "Eğitim": ["Okul/Üniversite - Bölüm - Mezuniyet Yılı"],
-        "Diller": ["Bilinen yabancı diller ve seviyeleri"],
-        "Sertifikalar": ["Sahip olunan sertifikalar, kurslar ve belgeler"],
-        "Yetenekler": "Öne çıkan teknik yetenekler, yazılımlar ve beceriler"
+        "Ad Soyad": "Adayın Tam Adı Soyadı",
+        "Telefon": "Adayın Telefon Numarası",
+        "E-posta": "Adayın E-posta Adresi",
+        "Adres": "İl / İlçe veya Ülke bilgisi",
+        "Toplam Tecrübe": "Örn: 4 Yıl veya Tahmini Süre",
+        "Deneyim": [
+            "Şirket Adı - Pozisyon / Unvan (Tarih Aralığı)"
+        ],
+        "Eğitim": [
+            "Okul/Üniversite Adı - Bölüm (Mezuniyet / Başlangıç Yılı)"
+        ],
+        "Diller": [
+            "Yabancı Dil Adı (Seviyesi)"
+        ],
+        "Sertifikalar": [
+            "Sertifika / Kurs / Belge Adı"
+        ],
+        "Yetenekler": "Adayın sahip olduğu teknik ve mesleki beceriler, kullandığı programlar"
     }}
 
     CV Metni:
     {file_text}
     """
 
-    response = None
-    available_models = []
-    
-    # 1. Aşama: API Anahtarının izinli olduğu modelleri dinamik listele
-    try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                available_models.append(m.name)
-    except Exception as list_err:
-        res_st.error(f"🚨 Model listeleme hatası: {list_err}. API anahtarının yetkilerini kontrol edin.")
-        return None
+    models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp", "gemini-pro"]
+    raw_text = None
+    last_error = ""
 
-    if not available_models:
-        res_st.error("🚨 Bu API anahtarının erişebildiği hiçbir 'generateContent' modeli bulunamadı. Lütfen aistudio.google.com üzerinden yeni bir anahtar oluşturun.")
-        return None
+    for model in models:
+        url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent?key={api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.1}
+        }
+        headers = {"Content-Type": "application/json"}
 
-    # 2. Aşama: Bulunan aktif modeller üzerinden sırayla dene
-    errors = []
-    for model_name in available_models:
         try:
-            model = genai.GenerativeModel(model_name)
-            res = model.generate_content(prompt)
-            if res and hasattr(res, 'text') and res.text:
-                response = res
+            res = requests.post(url, json=payload, headers=headers, timeout=30)
+            if res.status_code == 200:
+                res_json = res.json()
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
                 break
-        except Exception as e:
-            errors.append(f"{model_name}: {str(e)}")
+            else:
+                last_error = f"{model} ({res.status_code}): {res.text}"
+        except Exception as ex:
+            last_error = f"{model} Hata: {str(ex)}"
             continue
 
-    if not response:
-        res_st.error(f"🚨 Modeller çalıştırılamadı: {' | '.join(errors)}")
+    if not raw_text:
+        res_st.error(f"🚨 API Yanıt Hatası: {last_error}")
         return None
 
-    raw_response = response.text.strip().replace("```json", "").replace("```", "")
+    clean_json = raw_text.strip().replace("```json", "").replace("```", "")
     
     try:
-        data = json.loads(raw_response)
+        data = json.loads(clean_json)
     except Exception:
         data = {
             "Ad Soyad": "Analiz Edilemedi",
-            "Telefon": "Bulunamadı",
-            "E-posta": "Bulunamadı",
-            "Adres": "Bulunamadı",
-            "Toplam Tecrübe": "Bulunamadı",
-            "Deneyim": [raw_response[:100]],
-            "Eğitim": ["Bulunamadı"],
-            "Diller": ["Bulunamadı"],
-            "Sertifikalar": ["Bulunamadı"],
+            "Telefon": detected_phone,
+            "E-posta": detected_email,
+            "Adres": "Belirtilmemiş",
+            "Toplam Tecrübe": "Belirtilmemiş",
+            "Deneyim": [clean_json[:120]],
+            "Eğitim": ["Belirtilmemiş"],
+            "Diller": ["Belirtilmemiş"],
+            "Sertifikalar": ["Belirtilmemiş"],
             "Yetenekler": "Genel"
         }
+
+    # Eğer yapay zeka boş döndüyse regex ile yakalanan telefon/maili otomatik ata
+    if data.get("Telefon") in ["Bulunamadı", "Belirtilmemiş", None, ""] and detected_phone != "Belirtilmemiş":
+        data["Telefon"] = detected_phone
+    if data.get("E-posta") in ["Bulunamadı", "Belirtilmemiş", None, ""] and detected_email != "Belirtilmemiş":
+        data["E-posta"] = detected_email
+
     return data
 
 def generate_email_template(aday_isim, durum):
@@ -163,7 +206,7 @@ if 'current_pdf_name' not in res_st.session_state:
     res_st.session_state.current_pdf_name = None
 
 # ----------------------------------------
-# 🚪 GELİŞMİŞ B2B GİRİŞ YAP / KAYIT OL EKRANI
+# 🚪 B2B GİRİŞ YAP / KAYIT OL EKRANI
 # ----------------------------------------
 if not res_st.session_state.logged_in:
     col_auth_left, col_auth_right = res_st.columns([1.2, 1])
@@ -174,7 +217,6 @@ if not res_st.session_state.logged_in:
         
         if auth_mode == "Kayıt Ol (Yeni Hesap)":
             res_st.markdown("##### 📝 Hesap Tipi & Kullanıcı Bilgileri")
-            
             hesap_turu = res_st.selectbox("Hesap Türü Seçin:", ["Bireysel Kullanıcı", "Kurumsal / Şirket"])
             
             c1, c2 = res_st.columns(2)
@@ -268,10 +310,10 @@ if not res_st.session_state.logged_in:
         res_st.markdown("""
             ### 💼 ParserFlow SaaS Platformu
             
-            * **Özelleştirilmiş İK Portalı:** Bireysel veya Kurumsal hesap seçeneği.
-            * **Şirket ve Fatura Entegrasyonu:** Şirketiniz için vergi bilgileriyle resmi profil.
-            * **Gemini Yapay Zeka:** Tam yapay zeka entegrasyonu ile dakikalar değil saniyeler içinde CV tarama.
-            * **Kesintisiz MongoDB Bulut:** Verileriniz güvende, tüm ekibiniz için erişilebilir.
+            * **Gelişmiş Metin ve Düzen Algılama:** 2 sütunlu karmaşık CV şablonlarını kayıpsız okuma.
+            * **Çift Doğrulamalı İletişim Tarama:** Telefon ve e-postaları Regex + Gemini hibrit motoruyla kaçırmaz.
+            * **Şirket ve Fatura Entegrasyonu:** B2B şirketler için kurumsal profil.
+            * **Kesintisiz Depolama:** Özgeçmişler ve orijinal PDF dosyaları tek tıkla elinizin altında.
         """)
 
 # ----------------------------------------
@@ -316,7 +358,7 @@ else:
                 res_st.success(f"🔄 {uploaded_file.name} analize hazır.")
                 if res_st.button("🚀 Yapay Zeka İle Analiz Et", type="primary"):
                     if u_info and (u_info["paket_turu"] == "Sınırsız (Kurumsal)" or u_info["kalan_hak"] > 0):
-                        with res_st.spinner("🤖 Google Gemini CV'yi analiz ediyor..."):
+                        with res_st.spinner("🤖 Gelişmiş motor CV detaylarını ayıklıyor..."):
                             pdf_bytes = uploaded_file.getvalue()
                             cv_text = extract_text_from_pdf(uploaded_file)
                             
@@ -397,7 +439,6 @@ else:
                 else:
                     res_st.write(res.get('Diller'))
 
-                res_st.write("---")
                 res_st.write("**📜 Sertifikalar & Kurslar:**")
                 if isinstance(res.get('Sertifikalar'), list):
                     for s in res.get('Sertifikalar'):
