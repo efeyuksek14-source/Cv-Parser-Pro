@@ -40,14 +40,9 @@ except Exception as e:
     res_st.stop()
 
 # Gemini API Yapılandırması
-api_key_status = True
-try:
-    if "GEMINI_API_KEY" in res_st.secrets and res_st.secrets["GEMINI_API_KEY"].strip():
-        genai.configure(api_key=res_st.secrets["GEMINI_API_KEY"].strip())
-    else:
-        api_key_status = False
-except Exception as e:
-    api_key_status = False
+api_key_val = res_st.secrets.get("GEMINI_API_KEY", "").strip()
+if api_key_val:
+    genai.configure(api_key=api_key_val)
 
 # --- GÜVENLİK İÇİN ŞİFRE HASHLEME FONKSİYONLARI ---
 def make_hashes(password):
@@ -67,14 +62,9 @@ def extract_text_from_pdf(uploaded_file):
     return text
 
 def analyze_cv_real(file_text):
-    if not api_key_status:
-        res_st.error("❌ Streamlit Secrets içerisinde geçerli bir GEMINI_API_KEY bulunamadı!")
+    if not api_key_val:
+        res_st.error("❌ Streamlit Secrets içerisinde GEMINI_API_KEY bulunamadı!")
         return None
-
-    # Google API'deki aktif ve desteklenen tüm model varyasyonları
-    model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-pro']
-    response = None
-    errors = []
 
     prompt = f"""
     Sen uzman bir İnsan Kaynakları yapay zeka asistanısın. Aşağıda metni verilen CV'yi incele ve bilgileri MÜKEMMEL BİR JSON FORMATINDA çıkar.
@@ -98,28 +88,44 @@ def analyze_cv_real(file_text):
     {file_text}
     """
 
-    for m_name in model_names:
+    response = None
+    available_models = []
+    
+    # 1. Aşama: API Anahtarının izinli olduğu modelleri dinamik listele
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
+    except Exception as list_err:
+        res_st.error(f"🚨 Model listeleme hatası: {list_err}. API anahtarının yetkilerini kontrol edin.")
+        return None
+
+    if not available_models:
+        res_st.error("🚨 Bu API anahtarının erişebildiği hiçbir 'generateContent' modeli bulunamadı. Lütfen aistudio.google.com üzerinden yeni bir anahtar oluşturun.")
+        return None
+
+    # 2. Aşama: Bulunan aktif modeller üzerinden sırayla dene
+    errors = []
+    for model_name in available_models:
         try:
-            model = genai.GenerativeModel(m_name)
+            model = genai.GenerativeModel(model_name)
             res = model.generate_content(prompt)
             if res and hasattr(res, 'text') and res.text:
                 response = res
                 break
-        except Exception as err:
-            errors.append(f"{m_name}: {str(err)}")
+        except Exception as e:
+            errors.append(f"{model_name}: {str(e)}")
             continue
 
     if not response:
-        # Eğer hiçbiri çalışmazsa arkadaki gerçek teknik hatayı ekrana basıyoruz
-        err_msg = " | ".join(errors) if errors else "Bilinmeyen API Hatası"
-        res_st.error(f"🚨 API Bağlantı Detayı: {err_msg}")
+        res_st.error(f"🚨 Modeller çalıştırılamadı: {' | '.join(errors)}")
         return None
 
     raw_response = response.text.strip().replace("```json", "").replace("```", "")
     
     try:
         data = json.loads(raw_response)
-    except:
+    except Exception:
         data = {
             "Ad Soyad": "Analiz Edilemedi",
             "Telefon": "Bulunamadı",
